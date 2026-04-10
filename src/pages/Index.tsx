@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatSAR } from "@/lib/utils";
+import { useLang } from "@/lib/lang";
+import {
+  cityName, districtName, propTypeName, conditionName, txTypeName,
+} from "@/lib/i18n";
 
 const defaultInput: PropertyInput = {
   city: "Riyadh", district: "Al Olaya", propertyType: "Residential Villa",
@@ -20,7 +24,6 @@ const defaultInput: PropertyInput = {
 };
 
 const fmt = formatSAR;
-
 const pct = (n: number, decimals = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(decimals)}%`;
 const bps = (n: number) => `${(n * 10_000).toFixed(0)}bps`;
 
@@ -49,6 +52,7 @@ const Index = () => {
   const [result, setResult] = useState<ValuationResult | null>(null);
   const [activeScenario, setActiveScenario] = useState<number | null>(null);
   const navigate = useNavigate();
+  const { t, lang, isAr } = useLang();
 
   const setField = <K extends keyof PropertyInput>(key: K, value: PropertyInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -65,7 +69,7 @@ const Index = () => {
 
   const handleGenerate = () => {
     if (!input.size || input.size <= 0) {
-      toast.error("Please enter a valid size (sqm > 0)");
+      toast.error(t("form.sizeError"));
       return;
     }
     setResult(computeValuation(input));
@@ -80,15 +84,19 @@ const Index = () => {
 
   const handleSaveCase = () => {
     if (!result) return;
-    const title = `${input.propertyType} — ${input.district}, ${input.city}`;
+    const title = `${propTypeName(input.propertyType, lang)} — ${districtName(input.district, lang)}, ${cityName(input.city, lang)}`;
     const id = generateCaseId();
     saveCase({ id, title, input: { ...input }, result, status: "Draft", createdAt: new Date().toISOString(), checklist: DEFAULT_CHECKLIST.map(i => ({ ...i })), legalReview: { ...DEFAULT_LEGAL_REVIEW, notes: [] } });
-    toast.success("Case saved", { description: title });
+    toast.success(t("result.saveCase"), { description: title });
     navigate(`/cases/${id}`);
   };
 
   const availableDistricts = DISTRICTS[input.city] ?? ["Central District"];
   const isRent = input.transactionType === "Rent";
+
+  const confLevel = result?.confidence.level;
+  const confBadgeVariant = confLevel === "High" ? "high" : confLevel === "Medium" ? "medium" : "low";
+  const confLabel = confLevel ? `${t(`conf.${confLevel}`)} · ${result!.confidence.score}/100` : "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,89 +106,88 @@ const Index = () => {
         <section className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 bg-secondary border border-border rounded-full px-3 py-1 text-xs text-muted-foreground mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-            Dual-Approach Valuation Engine · Q1 2026
+            {t("hero.badge")}
           </div>
-          <h1 className="text-3xl font-serif text-foreground tracking-tight">AOUJ</h1>
-          <h2 className="text-lg text-muted-foreground">Directional Property Valuation</h2>
+          <h1 className="text-3xl font-serif text-foreground tracking-tight">{t("hero.title")}</h1>
+          <h2 className="text-lg text-muted-foreground">{t("hero.subtitle")}</h2>
           <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Sales comparison + income approach reconciliation with financing analysis,
-            cap rate sensitivity, and TAQEEM compliance signals.
+            {t("hero.desc")}
           </p>
         </section>
 
         {/* Scenarios */}
         <section className="flex flex-col sm:flex-row gap-3 justify-center">
-          {SAMPLE_SCENARIOS.map((s, i) => (
+          {SAMPLE_SCENARIOS.map((_, i) => (
             <Button key={i} variant="scenario" size="lg"
               className={`flex-1 max-w-xs flex flex-col items-start h-auto py-4 px-5 ${activeScenario === i ? "border-primary text-primary" : ""}`}
               onClick={() => handleScenario(i)}>
-              <span className="font-semibold text-sm">{s.label}</span>
-              <span className="text-xs text-muted-foreground mt-0.5">{s.description}</span>
+              <span className="font-semibold text-sm">{t(`scenario.${i}.label`)}</span>
+              <span className="text-xs text-muted-foreground mt-0.5">{t(`scenario.${i}.description`)}</span>
             </Button>
           ))}
         </section>
 
         {/* Form */}
         <section className="bg-card border border-border rounded-lg p-6">
-          <h3 className="text-base text-foreground mb-5 font-serif">Property Details</h3>
+          <h3 className="text-base text-foreground mb-5 font-serif">{t("form.title")}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="City / Region">
+            <Field label={t("form.city")}>
               <select value={input.city} onChange={(e) => handleCityChange(e.target.value)} className={selectCls}>
-                {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CITIES.map((c) => <option key={c} value={c}>{cityName(c, lang)}</option>)}
               </select>
             </Field>
-            <Field label="District">
+            <Field label={t("form.district")}>
               <select value={input.district} onChange={(e) => setField("district", e.target.value)} className={selectCls}>
-                {availableDistricts.map((d) => <option key={d} value={d}>{d}</option>)}
+                {availableDistricts.map((d) => <option key={d} value={d}>{districtName(d, lang)}</option>)}
               </select>
             </Field>
-            <Field label="Property Type">
+            <Field label={t("form.propertyType")}>
               <select value={input.propertyType} onChange={(e) => setField("propertyType", e.target.value)} className={selectCls}>
-                {PROPERTY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{propTypeName(type, lang)}</option>)}
               </select>
             </Field>
-            <Field label="Size (sqm)">
+            <Field label={t("form.size")}>
               <input type="number" value={input.size || ""} min={1} max={100_000}
                 onChange={(e) => setField("size", Math.max(0, Number(e.target.value) || 0))}
-                className={inputCls} placeholder="e.g. 300" />
+                className={inputCls} placeholder={t("form.sizePlaceholder")} />
             </Field>
-            <Field label="Condition">
+            <Field label={t("form.condition")}>
               <select value={input.condition} onChange={(e) => setField("condition", e.target.value)} className={selectCls}>
-                {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CONDITIONS.map((c) => <option key={c} value={c}>{conditionName(c, lang)}</option>)}
               </select>
             </Field>
-            <Field label="Transaction Type">
+            <Field label={t("form.txType")}>
               <select value={input.transactionType} onChange={(e) => setField("transactionType", e.target.value)} className={selectCls}>
-                {TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {TRANSACTION_TYPES.map((tx) => <option key={tx} value={tx}>{txTypeName(tx, lang)}</option>)}
               </select>
             </Field>
-            <Field label="Year Built (optional)">
+            <Field label={t("form.yearBuilt")}>
               <input type="number" value={input.yearBuilt ?? ""} min={1900} max={new Date().getFullYear()}
                 onChange={(e) => setField("yearBuilt", e.target.value ? Number(e.target.value) : undefined)}
-                className={inputCls} placeholder="e.g. 2010" />
+                className={inputCls} placeholder={t("form.yearPlaceholder")} />
             </Field>
             {input.propertyType === "Apartment" && (
-              <Field label="Floor Level (optional)">
+              <Field label={t("form.floorLevel")}>
                 <input type="number" value={input.floorLevel ?? ""} min={1} max={80}
                   onChange={(e) => setField("floorLevel", e.target.value ? Number(e.target.value) : undefined)}
-                  className={inputCls} placeholder="e.g. 8" />
+                  className={inputCls} placeholder={t("form.floorPlaceholder")} />
               </Field>
             )}
             {input.propertyType === "Commercial" && (
-              <Field label="Street Frontage / Corner Plot">
+              <Field label={t("form.frontage")}>
                 <label className="flex items-center gap-2 cursor-pointer mt-1">
                   <input type="checkbox" checked={!!input.hasStreetFrontage}
                     onChange={(e) => setField("hasStreetFrontage", e.target.checked)}
                     className="w-4 h-4 accent-primary" />
-                  <span className="text-sm text-secondary-foreground">Corner / street-facing plot (+25%)</span>
+                  <span className="text-sm text-secondary-foreground">{t("form.frontageDesc")}</span>
                 </label>
               </Field>
             )}
           </div>
-          <div className="mt-6 flex justify-end">
+          <div className={`mt-6 flex ${isAr ? "justify-start" : "justify-end"}`}>
             <Button variant="gold" size="lg" onClick={handleGenerate}>
               <TrendingUp className="w-4 h-4 mr-2" />
-              Generate Analysis
+              {t("form.generate")}
             </Button>
           </div>
         </section>
@@ -192,20 +199,18 @@ const Index = () => {
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
                   <h3 className="text-base font-serif text-foreground">
-                    {isRent ? "Annual Rent Estimate" : "Reconciled Valuation"}
+                    {isRent ? t("result.rentTitle") : t("result.reconciledTitle")}
                   </h3>
-                  <Badge variant={result.confidence.level === "High" ? "high" : result.confidence.level === "Medium" ? "medium" : "low"}>
-                    {result.confidence.level} Confidence · {result.confidence.score}/100
-                  </Badge>
+                  <Badge variant={confBadgeVariant}>{confLabel}</Badge>
                 </div>
                 <Button variant="ghost" size="sm" onClick={handleSaveCase} className="text-primary hover:text-primary">
-                  <Save className="w-4 h-4 mr-1.5" />Save as Case
+                  <Save className="w-4 h-4 mr-1.5" />{t("result.saveCase")}
                 </Button>
               </div>
 
               <div className="bg-secondary rounded-lg p-5 text-center">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-                  {isRent ? "Estimated Annual Rent (SAR/yr)" : "Estimated Range (SAR)"}
+                  {isRent ? t("result.rentLabel") : t("result.rangeLabel")}
                 </p>
                 <p className="text-3xl font-serif text-foreground">
                   {fmt(result.reconciledLow)}
@@ -213,7 +218,7 @@ const Index = () => {
                   {fmt(result.reconciledHigh)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Midpoint: {fmt(result.reconciledValue)} · SAR {result.pricePerSqm.toLocaleString()}/sqm
+                  {t("result.midpoint")}: {fmt(result.reconciledValue)} · {t("result.perSqm", { v: result.pricePerSqm.toLocaleString() })}
                 </p>
               </div>
 
@@ -221,13 +226,13 @@ const Index = () => {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="bg-secondary/60 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground mb-1">
-                      Sales Comparison ({Math.round(result.salesCompWeight * 100)}% weight)
+                      {t("result.salesCompLabel", { w: Math.round(result.salesCompWeight * 100) })}
                     </p>
                     <p className="font-mono text-foreground">{fmt(result.salesCompValue)}</p>
                   </div>
                   <div className="bg-secondary/60 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground mb-1">
-                      Income Approach ({Math.round(result.incomeWeight * 100)}% weight)
+                      {t("result.incomeLabel", { w: Math.round(result.incomeWeight * 100) })}
                     </p>
                     <p className="font-mono text-foreground">{fmt(result.incomeApproach.incomeValue)}</p>
                   </div>
@@ -236,13 +241,12 @@ const Index = () => {
 
               {result.depreciationNote && (
                 <p className="text-xs text-muted-foreground bg-secondary/40 rounded px-3 py-2 border border-border">
-                  Depreciation: {result.depreciationNote}
+                  {t("result.depreciation")}: {result.depreciationNote}
                 </p>
               )}
 
-              {/* Reasoning */}
               <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Valuation Build-Up</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">{t("result.buildUp")}</p>
                 <ul className="space-y-1.5">
                   {result.reasoning.map((r, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-secondary-foreground">
@@ -262,44 +266,42 @@ const Index = () => {
               )}
             </section>
 
-            {/* ── 2. Income Approach Detail ── */}
+            {/* ── 2. Income Approach ── */}
             {result.incomeApproach && (
               <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
-                <SectionHeader icon={<DollarSign className="w-4 h-4" />} title="Income Approach — NOI Analysis" />
-                <Row label="Gross Rental Income" value={fmt(result.incomeApproach.grossRentalIncome)} sub="/yr" />
+                <SectionHeader icon={<DollarSign className="w-4 h-4" />} title={t("income.title")} />
+                <Row label={t("income.gri")} value={fmt(result.incomeApproach.grossRentalIncome)} sub={t("income.perYr")} />
                 <Row
-                  label={`Vacancy Allowance (${Math.round(result.incomeApproach.vacancyRate * 100)}% — ${result.incomeApproach.vacancySource})`}
-                  value={`−${fmt(result.incomeApproach.grossRentalIncome - result.incomeApproach.effectiveGrossIncome)}`} sub="/yr" />
-                <Row label="Effective Gross Income" value={fmt(result.incomeApproach.effectiveGrossIncome)} sub="/yr" />
-                <Row label={`Operating Expenses (${Math.round(result.incomeApproach.opexRatio * 100)}% of EGI)`}
-                  value={`−${fmt(result.incomeApproach.operatingExpenses)}`} sub="/yr" />
-                <Row label="Net Operating Income (NOI)" value={fmt(result.incomeApproach.noi)} sub="/yr" bold />
+                  label={t("income.vacancy", { v: Math.round(result.incomeApproach.vacancyRate * 100), src: result.incomeApproach.vacancySource })}
+                  value={`−${fmt(result.incomeApproach.grossRentalIncome - result.incomeApproach.effectiveGrossIncome)}`} sub={t("income.perYr")} />
+                <Row label={t("income.egi")} value={fmt(result.incomeApproach.effectiveGrossIncome)} sub={t("income.perYr")} />
                 <Row
-                  label={`Market Cap Rate — ${result.incomeApproach.capRateSource}`}
+                  label={t("income.opex", { v: Math.round(result.incomeApproach.opexRatio * 100) })}
+                  value={`−${fmt(result.incomeApproach.operatingExpenses)}`} sub={t("income.perYr")} />
+                <Row label={t("income.noi")} value={fmt(result.incomeApproach.noi)} sub={t("income.perYr")} bold />
+                <Row
+                  label={t("income.capRate", { src: result.incomeApproach.capRateSource })}
                   value={`${(result.incomeApproach.capRate * 100).toFixed(2)}%`} />
-                <Row label="Income Approach Value" value={fmt(result.incomeApproach.incomeValue)} bold />
-                <Row label="Implied Gross Yield (GRI ÷ Sales Comp)"
-                  value={`${(result.incomeApproach.impliedGrossYield * 100).toFixed(2)}%`} />
+                <Row label={t("income.value")} value={fmt(result.incomeApproach.incomeValue)} bold />
+                <Row label={t("income.yield")} value={`${(result.incomeApproach.impliedGrossYield * 100).toFixed(2)}%`} />
               </section>
             )}
 
-            {/* ── 3. Sensitivity Analysis ── */}
+            {/* ── 3. Sensitivity ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
               <SectionHeader icon={<BarChart2 className="w-4 h-4" />}
-                title={result.sensitivityType === "cap_rate" ? "Cap Rate Sensitivity" : "Market Price Sensitivity"} />
+                title={result.sensitivityType === "cap_rate" ? t("sens.capTitle") : t("sens.mktTitle")} />
               <p className="text-xs text-muted-foreground mb-4">
-                {result.sensitivityType === "cap_rate"
-                  ? "Impact on income approach value from cap rate movements (NOI held constant)."
-                  : "Impact on reconciled value from market price movements (bull / base / bear)."}
+                {result.sensitivityType === "cap_rate" ? t("sens.capNote") : t("sens.mktNote")}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-muted-foreground uppercase tracking-wider">
-                      <th className="text-left pb-3">Scenario</th>
-                      <th className="text-right pb-3">{result.sensitivityType === "cap_rate" ? "Cap Rate" : "Shift"}</th>
-                      <th className="text-right pb-3">Value</th>
-                      <th className="text-right pb-3">Δ vs Base</th>
+                      <th className="text-left pb-3">{t("sens.scenario")}</th>
+                      <th className="text-right pb-3">{result.sensitivityType === "cap_rate" ? t("sens.capRate") : t("sens.shift")}</th>
+                      <th className="text-right pb-3">{t("sens.value")}</th>
+                      <th className="text-right pb-3">{t("sens.delta")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -323,36 +325,36 @@ const Index = () => {
               </div>
             </section>
 
-            {/* ── 4. Financing & LTV ── */}
+            {/* ── 4. Financing ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
-              <SectionHeader icon={<Building2 className="w-4 h-4" />} title="Financing & Risk Analysis" />
+              <SectionHeader icon={<Building2 className="w-4 h-4" />} title={t("fin.title")} />
               {isRent && (
                 <p className="text-xs text-amber-400 bg-amber-900/20 border border-amber-700/30 rounded px-3 py-2 mb-4">
-                  LTV analysis based on implied capital value of the income stream. For rent mandates, financing is assessed against the underlying asset value.
+                  {t("fin.rentNote")}
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                 <div>
-                  <Row label="SAMA Max LTV" value={`${Math.round(result.ltvAnalysis.samaMaxLTV * 100)}%`} />
-                  <Row label="Implied Max Loan" value={fmt(result.ltvAnalysis.impliedMaxLoan)} bold />
-                  <Row label="Lending Rate (proxy)" value={`${(result.ltvAnalysis.lendingRate * 100).toFixed(2)}%`} />
+                  <Row label={t("fin.samaLtv")} value={`${Math.round(result.ltvAnalysis.samaMaxLTV * 100)}%`} />
+                  <Row label={t("fin.maxLoan")} value={fmt(result.ltvAnalysis.impliedMaxLoan)} bold />
+                  <Row label={t("fin.lendingRate")} value={`${(result.ltvAnalysis.lendingRate * 100).toFixed(2)}%`} />
                   {result.ltvAnalysis.annualDebtService !== null && (
-                    <Row label="Annual Debt Service (20yr)" value={fmt(result.ltvAnalysis.annualDebtService)} sub="/yr" />
+                    <Row label={t("fin.debtService")} value={fmt(result.ltvAnalysis.annualDebtService)} sub={t("fin.perYr")} />
                   )}
                 </div>
                 <div>
-                  <Row label={`Forced Sale Value (${Math.round(result.ltvAnalysis.fsHaircut * 100)}% haircut)`}
+                  <Row
+                    label={t("fin.fsv", { v: Math.round(result.ltvAnalysis.fsHaircut * 100) })}
                     value={fmt(result.ltvAnalysis.forcedSaleValue)} bold />
-                  <Row label="FSV as % of Market Value"
-                    value={`${Math.round((1 - result.ltvAnalysis.fsHaircut) * 100)}%`} />
+                  <Row label={t("fin.fsvPct")} value={`${Math.round((1 - result.ltvAnalysis.fsHaircut) * 100)}%`} />
                   {result.ltvAnalysis.dscr !== null && (
                     <div className="flex justify-between items-center py-2 border-b border-border">
-                      <span className="text-sm text-secondary-foreground">DSCR</span>
+                      <span className="text-sm text-secondary-foreground">{t("fin.dscr")}</span>
                       <span className={`text-sm font-mono font-semibold flex items-center gap-1.5
                         ${result.ltvAnalysis.dscrFlag === "pass" ? "text-emerald-400" : result.ltvAnalysis.dscrFlag === "warn" ? "text-amber-400" : "text-red-400"}`}>
                         {result.ltvAnalysis.dscrFlag === "pass" ? <CheckCircle className="w-3.5 h-3.5" /> : result.ltvAnalysis.dscrFlag === "warn" ? <AlertCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                         {result.ltvAnalysis.dscr.toFixed(2)}x
-                        <span className="text-xs font-normal text-muted-foreground">(min 1.25x)</span>
+                        <span className="text-xs font-normal text-muted-foreground">{t("fin.dscrMin")}</span>
                       </span>
                     </div>
                   )}
@@ -362,19 +364,19 @@ const Index = () => {
 
             {/* ── 5. Market Context ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
-              <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title="Market Context" />
+              <SectionHeader icon={<TrendingUp className="w-4 h-4" />} title={t("mkt.title")} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                 <div>
-                  <Row label={`SAMA Repo Rate (${result.marketContext.rateVintage})`}
+                  <Row
+                    label={t("mkt.samaRate", { vintage: result.marketContext.rateVintage })}
                     value={`${(result.marketContext.samaRepoRate * 100).toFixed(2)}%`} />
-                  <Row label="Implied Cap Rate Floor (Repo +150bps)"
-                    value={`${(result.marketContext.impliedCapRateFloor * 100).toFixed(2)}%`} />
+                  <Row label={t("mkt.capFloor")} value={`${(result.marketContext.impliedCapRateFloor * 100).toFixed(2)}%`} />
                   {result.marketContext.yieldSpread !== null && (
-                    <Row label="Yield Spread over Repo" value={bps(result.marketContext.yieldSpread)} bold />
+                    <Row label={t("mkt.yieldSpread")} value={bps(result.marketContext.yieldSpread)} bold />
                   )}
                 </div>
                 <div className="mt-4 sm:mt-0">
-                  <p className="text-xs text-muted-foreground mb-2">Spread Assessment</p>
+                  <p className="text-xs text-muted-foreground mb-2">{t("mkt.spreadAssess")}</p>
                   <p className="text-sm text-secondary-foreground leading-relaxed">{result.marketContext.spreadComment}</p>
                 </div>
               </div>
@@ -386,27 +388,25 @@ const Index = () => {
               )}
             </section>
 
-            {/* ── 6. Confidence Breakdown ── */}
+            {/* ── 6. Confidence ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
-              <SectionHeader icon={<BarChart2 className="w-4 h-4" />} title="Confidence Scoring" />
+              <SectionHeader icon={<BarChart2 className="w-4 h-4" />} title={t("conf.title")} />
               <div className="flex items-center gap-4 mb-5">
                 <div className="flex-1 bg-secondary rounded-full h-2 overflow-hidden">
                   <div className="h-full bg-primary rounded-full transition-all"
                     style={{ width: `${result.confidence.score}%` }} />
                 </div>
-                <Badge variant={result.confidence.level === "High" ? "high" : result.confidence.level === "Medium" ? "medium" : "low"}>
-                  {result.confidence.score}/100
-                </Badge>
+                <Badge variant={confBadgeVariant}>{result.confidence.score}/100</Badge>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 {[
-                  { label: "City Data", score: result.confidence.cityScore },
-                  { label: "District", score: result.confidence.districtScore },
-                  { label: "Asset Type", score: result.confidence.propertyTypeScore },
-                  { label: "Market Activity", score: result.confidence.marketActivityScore },
-                ].map(({ label, score }) => (
-                  <div key={label} className="bg-secondary rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">{label}</p>
+                  { labelKey: "conf.cityData",    score: result.confidence.cityScore },
+                  { labelKey: "conf.district",     score: result.confidence.districtScore },
+                  { labelKey: "conf.assetType",    score: result.confidence.propertyTypeScore },
+                  { labelKey: "conf.mktActivity",  score: result.confidence.marketActivityScore },
+                ].map(({ labelKey, score }) => (
+                  <div key={labelKey} className="bg-secondary rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground">{t(labelKey)}</p>
                     <p className="text-lg font-mono text-foreground mt-1">{score}<span className="text-xs text-muted-foreground">/25</span></p>
                   </div>
                 ))}
@@ -421,9 +421,9 @@ const Index = () => {
               </ul>
             </section>
 
-            {/* ── 7. TAQEEM Compliance ── */}
+            {/* ── 7. TAQEEM ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
-              <SectionHeader icon={<Shield className="w-4 h-4" />} title="TAQEEM Compliance Signals" />
+              <SectionHeader icon={<Shield className="w-4 h-4" />} title={t("taqeem.title")} />
               <div className="space-y-3">
                 {result.taqeemFlags.map((flag) => (
                   <div key={flag.code}
@@ -442,15 +442,19 @@ const Index = () => {
             <section className="border-t border-border pt-8 pb-12">
               <div className="flex items-center gap-2 mb-4">
                 <Info className="w-4 h-4 text-primary" />
-                <h3 className="text-base font-serif text-foreground">Methodology & Limitations</h3>
+                <h3 className="text-base font-serif text-foreground">{t("meth.title")}</h3>
               </div>
               <div className="space-y-3 text-sm text-muted-foreground leading-relaxed max-w-3xl">
-                <p>
-                  AOUJ reconciles a <strong className="text-secondary-foreground">sales comparison approach</strong> (comparable transactions, district-adjusted) with an <strong className="text-secondary-foreground">income approach</strong> (NOI ÷ market cap rate, independently derived from rental comparables). Weights reflect asset class conventions used by institutional investors.
-                </p>
-                <p>
-                  Cap rates are sourced from investment transaction evidence (Q1 2026). Rental comparables are independently benchmarked from active lease market data. Neither dataset incorporates live REGA transaction feeds or TAQEEM-certified appraisals.
-                </p>
+                <p>{t("meth.p1")}</p>
+                <p>{t("meth.p2")}</p>
+                {/* Saudi-specific: Islamic finance + acquisition costs */}
+                <div className="bg-secondary/40 border border-border rounded-lg p-4 space-y-2">
+                  <p className="text-xs font-medium text-secondary-foreground uppercase tracking-wider mb-1">
+                    {isAr ? "ملاحظات خاصة بالسوق السعودي" : "Saudi Market Notes"}
+                  </p>
+                  <p className="text-xs">{t("meth.islamicNote")}</p>
+                  <p className="text-xs">{t("meth.acquisitionNote")}</p>
+                </div>
                 <p className="italic">{result.caveat}</p>
               </div>
             </section>

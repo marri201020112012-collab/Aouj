@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -26,4 +28,45 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
+}
+
+/* Arabic RTL typography */
+:lang(ar) body,
+[dir="rtl"] body {
+  font-family: 'Noto Sans Arabic', system-ui, sans-serif;
+}
+
+[dir="rtl"] .font-mono {
+  font-family: 'Noto Sans Arabic', ui-monospace, monospace;
+}
+
+[dir="rtl"] .font-serif {
+  font-family: 'Noto Sans Arabic', Georgia, serif;
+}
+
+/* RTL layout helpers */
+[dir="rtl"] .mr-1   { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .mr-1\.5 { margin-right: 0; margin-left: 0.375rem; }
+[dir="rtl"] .mr-2   { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .ml-1   { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .ml-2   { margin-left: 0; margin-right: 0.5rem; }
+
+[dir="rtl"] .text-left  { text-align: right; }
+[dir="rtl"] table th.text-left { text-align: right; }
+[dir="rtl"] table td   { text-align: right; }
+[dir="rtl"] table td.text-right { text-align: left; }
+[dir="rtl"] table th.text-right { text-align: left; }
+
+/* Arabic number formatting stays LTR inside RTL layout */
+[dir="rtl"] .font-mono {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* Flip chevron icons in RTL */
+[dir="rtl"] .lucide-chevron-right {
+  transform: scaleX(-1);
+}
+[dir="rtl"] .lucide-arrow-left {
+  transform: scaleX(-1);
 }

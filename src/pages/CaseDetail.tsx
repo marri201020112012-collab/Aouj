@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatSAR } from "@/lib/utils";
 import { ArrowLeft, ChevronRight, AlertTriangle, CheckSquare, Square, Plus, Trash2 } from "lucide-react";
+import { useLang } from "@/lib/lang";
+import { checklistLabel } from "@/lib/i18n";
 
 const STATUSES = ["Draft", "In Review", "Approved", "Closed"] as const;
 type Status = typeof STATUSES[number];
@@ -23,6 +25,7 @@ export default function CaseDetail() {
   const [loading, setLoading] = useState(true);
   const [noteInput, setNoteInput] = useState("");
   const noteRef = useRef<HTMLInputElement>(null);
+  const { t, lang } = useLang();
 
   useEffect(() => {
     if (id) {
@@ -36,15 +39,13 @@ export default function CaseDetail() {
   if (!c) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-center px-6">
-        <p className="text-muted-foreground">Case not found.</p>
+        <p className="text-muted-foreground">{t("detail.notFound")}</p>
         <Button variant="ghost" size="sm" onClick={() => navigate("/cases")}>
-          <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Cases
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> {t("detail.backFull")}
         </Button>
       </div>
     );
   }
-
-  // ── helpers ──────────────────────────────────────────────────────────────────
 
   function persist(updates: Partial<Case>) {
     const next = { ...c!, ...updates };
@@ -77,7 +78,8 @@ export default function CaseDetail() {
 
   const completedCount = c.checklist.filter((i: ChecklistItem) => i.checked).length;
 
-  // ── render ────────────────────────────────────────────────────────────────────
+  const confLevel = c.result.confidence.level;
+  const confBadgeVariant = confLevel === "High" ? "high" : confLevel === "Medium" ? "medium" : "low";
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,19 +87,18 @@ export default function CaseDetail() {
 
         {/* Back */}
         <Button variant="ghost" size="sm" onClick={() => navigate("/cases")}>
-          <ArrowLeft className="w-4 h-4 mr-1.5" /> Cases
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> {t("detail.back")}
         </Button>
 
         {/* Title + Status */}
         <div className="space-y-3">
           <h1 className="text-xl font-serif text-foreground">{c.title}</h1>
           <p className="text-xs text-muted-foreground">
-            Created {new Date(c.createdAt).toLocaleDateString("en-SA", { dateStyle: "medium" })}
+            {t("detail.created")} {new Date(c.createdAt).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA", { dateStyle: "medium" })}
           </p>
 
-          {/* Status toggle */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground mr-1">Status:</span>
+            <span className="text-xs text-muted-foreground mr-1">{t("detail.status")}</span>
             {STATUSES.map((s) => (
               <button
                 key={s}
@@ -108,7 +109,7 @@ export default function CaseDetail() {
                     : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                   }`}
               >
-                {s}
+                {t(`status.${s}`)}
               </button>
             ))}
           </div>
@@ -117,16 +118,16 @@ export default function CaseDetail() {
         {/* Property Details */}
         <section className="bg-card border border-border rounded-lg p-6">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
-            Property Details
+            {t("detail.propDetails")}
           </h2>
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
-              ["City", c.input.city],
-              ["District", c.input.district],
-              ["Type", c.input.propertyType],
-              ["Size", `${c.input.size} sqm`],
-              ["Condition", c.input.condition],
-              ["Transaction", c.input.transactionType],
+              [t("detail.city"),      c.input.city],
+              [t("detail.district"),  c.input.district],
+              [t("detail.type"),      c.input.propertyType],
+              [t("detail.size"),      `${c.input.size} ${t("detail.sqm")}`],
+              [t("detail.condition"), c.input.condition],
+              [t("detail.tx"),        c.input.transactionType],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -140,16 +141,16 @@ export default function CaseDetail() {
         <section className="bg-card border border-border rounded-lg p-6 space-y-5">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              Valuation Estimate
+              {t("detail.valuation")}
             </h2>
-            <Badge variant={c.result.confidence.level === "High" ? "high" : c.result.confidence.level === "Medium" ? "medium" : "low"}>
-              {c.result.confidence.level} · {c.result.confidence.score}/100
+            <Badge variant={confBadgeVariant}>
+              {t(`conf.${confLevel}`)} · {c.result.confidence.score}/100
             </Badge>
           </div>
 
           <div className="bg-secondary rounded-lg p-5 text-center">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-              Estimated Range (SAR)
+              {t("detail.rangeLabel")}
             </p>
             <p className="text-2xl font-serif text-foreground">
               {formatSAR(c.result.rangeLow)}
@@ -184,9 +185,9 @@ export default function CaseDetail() {
         <section className="bg-card border border-border rounded-lg p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              Due Diligence Checklist
+              {t("detail.checklist")}
             </h2>
-            <span className="text-xs text-muted-foreground">{completedCount}/{c.checklist.length} complete</span>
+            <span className="text-xs text-muted-foreground">{completedCount}/{c.checklist.length} {t("detail.complete")}</span>
           </div>
           <ul className="space-y-2">
             {c.checklist.map((item: ChecklistItem) => (
@@ -199,7 +200,7 @@ export default function CaseDetail() {
                   : <Square className="w-4 h-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 }
                 <span className={`text-sm ${item.checked ? "line-through text-muted-foreground" : "text-secondary-foreground"}`}>
-                  {item.label}
+                  {checklistLabel(item.label, lang)}
                 </span>
               </li>
             ))}
@@ -210,17 +211,16 @@ export default function CaseDetail() {
         <section className="bg-card border border-border rounded-lg p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              Legal Review
+              {t("detail.legal")}
             </h2>
             <span className={`text-xs border rounded-full px-2.5 py-0.5
               ${STATUS_STYLES[(c.status as Status)] ?? STATUS_STYLES["Draft"]}`}>
-              {c.legalReview.status}
+              {t(`status.${c.legalReview.status}`) || c.legalReview.status}
             </span>
           </div>
 
-          {/* Notes list */}
           {c.legalReview.notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No notes yet.</p>
+            <p className="text-sm text-muted-foreground">{t("detail.noNotes")}</p>
           ) : (
             <ul className="space-y-2">
               {c.legalReview.notes.map((note, i) => (
@@ -231,7 +231,7 @@ export default function CaseDetail() {
                   <button
                     onClick={() => deleteNote(i)}
                     className="shrink-0 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                    title="Delete note"
+                    title={t("detail.deleteNote")}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -240,7 +240,6 @@ export default function CaseDetail() {
             </ul>
           )}
 
-          {/* Add note input */}
           <div className="flex gap-2 pt-1">
             <input
               ref={noteRef}
@@ -248,7 +247,7 @@ export default function CaseDetail() {
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addNote()}
-              placeholder="Add a legal note…"
+              placeholder={t("detail.notePlaceholder")}
               className="flex-1 bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <Button variant="ghost" size="sm" onClick={addNote} disabled={!noteInput.trim()}
