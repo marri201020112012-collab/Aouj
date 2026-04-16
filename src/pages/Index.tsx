@@ -10,7 +10,11 @@ import { saveCase, generateCaseId, DEFAULT_CHECKLIST, DEFAULT_LEGAL_REVIEW } fro
 import {
   Shield, AlertTriangle, TrendingUp, ChevronRight, Save,
   DollarSign, BarChart2, Building2, Info, CheckCircle, XCircle, AlertCircle,
+  Calculator,
 } from "lucide-react";
+import {
+  computeIrrResult, DEFAULT_IRR_INPUTS, IrrInputs, HoldYears, RentGrowth, ExitCapDelta,
+} from "@/lib/irr";
 import { toast } from "sonner";
 import { formatSAR } from "@/lib/utils";
 import { useLang } from "@/lib/lang";
@@ -51,6 +55,7 @@ const Index = () => {
   const [input, setInput] = useState<PropertyInput>(defaultInput);
   const [result, setResult] = useState<ValuationResult | null>(null);
   const [activeScenario, setActiveScenario] = useState<number | null>(null);
+  const [irrInputs, setIrrInputs] = useState<IrrInputs>(DEFAULT_IRR_INPUTS);
   const navigate = useNavigate();
   const { t, lang, isAr } = useLang();
 
@@ -86,7 +91,19 @@ const Index = () => {
     if (!result) return;
     const title = `${propTypeName(input.propertyType, lang)} — ${districtName(input.district, lang)}, ${cityName(input.city, lang)}`;
     const id = generateCaseId();
-    saveCase({ id, title, input: { ...input }, result, status: "Draft", createdAt: new Date().toISOString(), checklist: DEFAULT_CHECKLIST.map(i => ({ ...i })), legalReview: { ...DEFAULT_LEGAL_REVIEW, notes: [] } });
+    const now = new Date().toISOString();
+    saveCase({
+      id, title, input: { ...input }, result,
+      stage: "Screening",
+      stageHistory: [{ stage: "Screening", timestamp: now }],
+      auditLog: [{ timestamp: now, event: "Case created" }],
+      decisionRecord: null,
+      assumptionNotes: "",
+      status: "Draft",
+      createdAt: now,
+      checklist: DEFAULT_CHECKLIST.map(i => ({ ...i })),
+      legalReview: { ...DEFAULT_LEGAL_REVIEW, notes: [] },
+    });
     toast.success(t("result.saveCase"), { description: title });
     navigate(`/cases/${id}`);
   };
@@ -103,33 +120,59 @@ const Index = () => {
       <main className="mx-auto max-w-5xl px-6 py-10 space-y-10">
 
         {/* Hero */}
-        <section className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 bg-secondary border border-border rounded-full px-3 py-1 text-xs text-muted-foreground mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+        <section className="text-center space-y-4 pt-2 hero-section">
+          <div className="inline-flex items-center gap-2 bg-secondary border border-border rounded-full px-3 py-1 text-xs text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-pulse" />
             {t("hero.badge")}
           </div>
-          <h1 className="text-3xl font-serif text-foreground tracking-tight">{t("hero.title")}</h1>
-          <h2 className="text-lg text-muted-foreground">{t("hero.subtitle")}</h2>
-          <p className="text-sm text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          <h1 className="text-5xl sm:text-6xl font-serif text-foreground tracking-tight leading-none">
+            {t("hero.title")}
+          </h1>
+          <h2 className="text-xs font-medium tracking-[0.2em] uppercase text-muted-foreground">
+            {t("hero.subtitle")}
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
             {t("hero.desc")}
           </p>
+          {/* Trust strip */}
+          <div className="flex items-start justify-center gap-6 sm:gap-10 pt-5 mt-2 border-t border-border/50 flex-wrap">
+            {[
+              { val: t("hero.stat1"), sub: t("hero.stat1sub") },
+              { val: t("hero.stat2"), sub: t("hero.stat2sub") },
+              { val: t("hero.stat3"), sub: t("hero.stat3sub") },
+              { val: t("hero.stat4"), sub: t("hero.stat4sub") },
+            ].map(({ val, sub }, i) => (
+              <div key={i} className="text-center min-w-[60px]">
+                <p className="text-sm font-semibold text-foreground tabular-nums">{val}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Scenarios */}
-        <section className="flex flex-col sm:flex-row gap-3 justify-center">
-          {SAMPLE_SCENARIOS.map((_, i) => (
-            <Button key={i} variant="scenario" size="lg"
-              className={`flex-1 max-w-xs flex flex-col items-start h-auto py-4 px-5 ${activeScenario === i ? "border-primary text-primary" : ""}`}
-              onClick={() => handleScenario(i)}>
-              <span className="font-semibold text-sm">{t(`scenario.${i}.label`)}</span>
-              <span className="text-xs text-muted-foreground mt-0.5">{t(`scenario.${i}.description`)}</span>
-            </Button>
-          ))}
+        <section className="space-y-3">
+          <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            {t("hero.scenarios")}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {SAMPLE_SCENARIOS.map((_, i) => (
+              <Button key={i} variant="scenario" size="lg"
+                className={`flex-1 max-w-xs flex flex-col items-start h-auto py-4 px-5 transition-all ${activeScenario === i ? "border-primary text-primary shadow-sm shadow-primary/10" : ""}`}
+                onClick={() => handleScenario(i)}>
+                <span className="font-semibold text-sm">{t(`scenario.${i}.label`)}</span>
+                <span className="text-xs text-muted-foreground mt-0.5">{t(`scenario.${i}.description`)}</span>
+              </Button>
+            ))}
+          </div>
         </section>
 
         {/* Form */}
-        <section className="bg-card border border-border rounded-lg p-6">
-          <h3 className="text-base text-foreground mb-5 font-serif">{t("form.title")}</h3>
+        <section className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-5">
+            <h3 className="text-base text-foreground font-serif shrink-0">{t("form.title")}</h3>
+            <div className="flex-1 h-px bg-border" />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t("form.city")}>
               <select value={input.city} onChange={(e) => handleCityChange(e.target.value)} className={selectCls}>
@@ -361,6 +404,110 @@ const Index = () => {
                 </div>
               </div>
             </section>
+
+            {/* ── 4.5 Return Analysis ── */}
+            {result.incomeApproach && !isRent && (() => {
+              const irr = computeIrrResult(
+                result.reconciledValue,
+                result.incomeApproach!.noi,
+                irrInputs,
+                result.ltvAnalysis,
+              );
+              const holdOpts: HoldYears[]    = [3, 5, 7, 10];
+              const growthOpts: { v: RentGrowth; label: string }[] = [
+                { v: -0.02, label: "−2%" }, { v: 0.00, label: "0%" },
+                { v: 0.02,  label: "+2%" }, { v: 0.04, label: "+4%" },
+              ];
+              const capOpts: { v: ExitCapDelta; labelKey: string }[] = [
+                { v: -0.005, labelKey: "irr.compress"  },
+                { v: 0,      labelKey: "irr.flat"      },
+                { v: 0.005,  labelKey: "irr.expand50"  },
+                { v: 0.010,  labelKey: "irr.expand100" },
+              ];
+              const pill = (active: boolean) =>
+                `px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                  active
+                    ? "bg-primary/15 border-primary text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`;
+              const irrFmt = (v: number | null) =>
+                v == null ? "—" : `${(v * 100).toFixed(1)}%`;
+              const moicFmt = (v: number | null) =>
+                v == null ? "—" : `${v.toFixed(2)}×`;
+              return (
+                <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
+                  <SectionHeader icon={<Calculator className="w-4 h-4" />} title={t("irr.title")} />
+
+                  {/* Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">{t("irr.holdYears")}</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {holdOpts.map(y => (
+                          <button key={y} onClick={() => setIrrInputs(p => ({ ...p, holdYears: y }))}
+                            className={pill(irrInputs.holdYears === y)}>{y}yr</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">{t("irr.rentGrowth")}</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {growthOpts.map(o => (
+                          <button key={o.v} onClick={() => setIrrInputs(p => ({ ...p, rentGrowthRate: o.v }))}
+                            className={pill(irrInputs.rentGrowthRate === o.v)}>{o.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">{t("irr.exitCap")}</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {capOpts.map(o => (
+                          <button key={o.v} onClick={() => setIrrInputs(p => ({ ...p, exitCapRateDelta: o.v }))}
+                            className={pill(irrInputs.exitCapRateDelta === o.v)}>{t(o.labelKey)}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Output */}
+                  {irr && (
+                    <>
+                      <div className={`grid gap-3 mb-4 ${irr.hasLeverage ? "grid-cols-2" : "grid-cols-1 max-w-xs"}`}>
+                        <div className="bg-secondary rounded-lg p-4">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">{t("irr.unlevered")}</p>
+                          <p className="text-2xl font-serif text-foreground">{irrFmt(irr.unleveredIRR)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t("irr.moic")} {moicFmt(irr.unleveredMoic)}</p>
+                        </div>
+                        {irr.hasLeverage && (
+                          <div className="bg-secondary rounded-lg p-4">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                              {t("irr.levered")} <span className="normal-case text-primary/70">· {t("irr.levNote")}</span>
+                            </p>
+                            <p className="text-2xl font-serif text-foreground">{irrFmt(irr.leveredIRR)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{t("irr.moic")} {moicFmt(irr.leveredMoic)}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        {[
+                          { l: t("irr.entryCapRate"), v: `${(irr.entryCapRate * 100).toFixed(2)}%` },
+                          { l: t("irr.exitCapRate"),  v: `${(irr.exitCapRate  * 100).toFixed(2)}%` },
+                          { l: t("irr.totalOutlay"),  v: fmt(irr.totalOutlay) },
+                          { l: t("irr.equityIn"),     v: fmt(irr.equityInvested) },
+                        ].map(({ l, v }) => (
+                          <div key={l} className="bg-secondary/50 rounded px-2 py-1.5">
+                            <p className="text-muted-foreground">{l}</p>
+                            <p className="font-mono text-foreground mt-0.5">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <p className="text-xs text-muted-foreground/70 mt-4 leading-relaxed">{t("irr.note")}</p>
+                </section>
+              );
+            })()}
 
             {/* ── 5. Market Context ── */}
             <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">

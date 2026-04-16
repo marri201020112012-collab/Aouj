@@ -1,10 +1,17 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { LangProvider } from "./lib/lang";
+import { seedDemoData } from "./lib/demoData";
 import Nav from "./components/Nav";
+import Landing from "./pages/Landing";
+import Screen from "./pages/Screen";
 import Index from "./pages/Index";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
+import Market from "./pages/Market";
+
+// Seed demo deals on first load (idempotent)
+seedDemoData();
 
 export default function App() {
   return (
@@ -13,9 +20,12 @@ export default function App() {
         <Toaster richColors position="top-right" />
         <Nav />
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/cases" element={<Cases />} />
+          <Route path="/"          element={<Landing />} />
+          <Route path="/screen"    element={<Screen />} />
+          <Route path="/valuation" element={<Index />} />
+          <Route path="/cases"     element={<Cases />} />
           <Route path="/cases/:id" element={<CaseDetail />} />
+          <Route path="/market"    element={<Market />} />
         </Routes>
       </LangProvider>
     </BrowserRouter>
