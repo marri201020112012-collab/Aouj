@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Market from "./pages/Market";
+import Opportunities from "./pages/Opportunities";
 
 // Seed demo deals on first load (idempotent)
 seedDemoData();
@@ -25,7 +26,8 @@ export default function App() {
           <Route path="/valuation" element={<Index />} />
           <Route path="/cases"     element={<Cases />} />
           <Route path="/cases/:id" element={<CaseDetail />} />
-          <Route path="/market"    element={<Market />} />
+          <Route path="/market"        element={<Market />} />
+          <Route path="/opportunities" element={<Opportunities />} />
         </Routes>
       </LangProvider>
     </BrowserRouter>

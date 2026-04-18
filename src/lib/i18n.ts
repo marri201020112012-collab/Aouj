@@ -13,6 +13,7 @@ const dict = {
   "nav.screen":       { en: "Screen",                   ar: "فرز" },
   "nav.valuation":    { en: "Valuation",                ar: "التقييم" },
   "nav.cases":        { en: "Cases",                    ar: "الملفات" },
+  "nav.source":       { en: "Source",                   ar: "مصادر" },
   "nav.market":       { en: "Market",                   ar: "السوق" },
   "nav.langToggle":   { en: "عربي",                     ar: "EN" },
 
