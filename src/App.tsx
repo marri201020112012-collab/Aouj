@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { LangProvider } from "./lib/lang";
 import { seedDemoData } from "./lib/demoData";
+import { seedDemoComps } from "./lib/comps";
 import Nav from "./components/Nav";
 import Landing from "./pages/Landing";
 import Screen from "./pages/Screen";
@@ -10,9 +11,11 @@ import Cases from "./pages/Cases";
 import CaseDetail from "./pages/CaseDetail";
 import Market from "./pages/Market";
 import Opportunities from "./pages/Opportunities";
+import Comps from "./pages/Comps";
 
-// Seed demo deals on first load (idempotent)
+// Seed demo data on first load (idempotent)
 seedDemoData();
+seedDemoComps();
 
 export default function App() {
   return (
@@ -28,6 +31,7 @@ export default function App() {
           <Route path="/cases/:id" element={<CaseDetail />} />
           <Route path="/market"        element={<Market />} />
           <Route path="/opportunities" element={<Opportunities />} />
+          <Route path="/comps"         element={<Comps />} />
         </Routes>
       </LangProvider>
     </BrowserRouter>

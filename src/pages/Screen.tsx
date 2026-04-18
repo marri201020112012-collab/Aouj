@@ -15,6 +15,9 @@ import { ScenarioPanel } from "@/components/ScenarioPanel";
 import {
   ScenarioOverrides, getScenario, saveScenario, resetScenario,
 } from "@/lib/scenario";
+import { getCompsForScreen } from "@/lib/comps";
+import { Eye, EyeOff, Link as LinkIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +145,12 @@ export default function Screen() {
 
   // Reactive — compute on every input change. Pure sync math, no debounce needed.
   const result = useMemo(() => runScreen(inp, scenario), [inp, scenario]);
+
+  // Comps — reload only when city or asset type changes
+  const relevantComps = useMemo(
+    () => getCompsForScreen(inp.city, inp.assetType, true).slice(0, 5),
+    [inp.city, inp.assetType]
+  );
   const vcfg   = VERDICT_CFG[result.verdict];
   const ccfg   = CONF_CFG[result.confidence];
 
@@ -510,6 +519,70 @@ export default function Screen() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground/60">{result.benchmarkSource}</p>
+              </div>
+            )}
+
+            {/* ── Comparable transactions ── */}
+            {relevantComps.length > 0 && (
+              <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Comparable Transactions
+                  </p>
+                  <Link
+                    to="/comps"
+                    className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity"
+                  >
+                    <LinkIcon className="w-3 h-3" />
+                    View all
+                  </Link>
+                </div>
+                <p className="text-xs text-muted-foreground/60">
+                  {inp.city} · {inp.assetType} — {relevantComps.length} comp{relevantComps.length > 1 ? "s" : ""} on record
+                </p>
+                <div className="space-y-1.5">
+                  {relevantComps.map(comp => {
+                    const dealPsm = result.pricePerSqm;
+                    const delta = dealPsm
+                      ? ((dealPsm - comp.psmPrice) / comp.psmPrice) * 100
+                      : null;
+                    return (
+                      <div
+                        key={comp.id}
+                        className="flex items-center gap-3 rounded-md bg-secondary/40 px-3 py-2 text-xs"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-foreground truncate">{comp.assetName}</p>
+                          <p className="text-muted-foreground/60">
+                            {comp.district} · {comp.transactionDate}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-mono text-foreground">
+                            {Math.round(comp.psmPrice).toLocaleString()} SAR/sqm
+                          </p>
+                          {delta !== null && (
+                            <p className={`font-mono ${
+                              Math.abs(delta) < 5 ? "text-muted-foreground" :
+                              delta > 0 ? "text-amber-400" : "text-emerald-400"
+                            }`}>
+                              {delta >= 0 ? "+" : ""}{delta.toFixed(0)}% vs deal
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0">
+                          <ProvenanceBadge status={comp.verificationStatus} />
+                        </div>
+                        <div className="shrink-0 text-muted-foreground/40" title={comp.isObserved ? "Observed" : "Inferred"}>
+                          {comp.isObserved
+                            ? <Eye className="w-3 h-3" />
+                            : <EyeOff className="w-3 h-3" />
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
