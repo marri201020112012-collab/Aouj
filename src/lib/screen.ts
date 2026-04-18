@@ -6,7 +6,8 @@
 // replace with real data sources as they become available.
 
 import { computeValuation, PropertyInput, VALUATION_SOURCE_ID } from "./valuation";
-import { computeIrrResult, HoldYears } from "./irr";
+import { computeIrrResult, HoldYears, RentGrowth } from "./irr";
+import { ScenarioOverrides, SCENARIO_SOURCE_ID, hasScenario } from "./scenario";
 
 // ── Constants (mirrored from valuation.ts) ────────────────────────────────────
 
@@ -62,10 +63,16 @@ export interface RiskFlag {
 export interface ScreenResult {
   // Price benchmarking
   pricePerSqm:        number | null;
-  benchmarkPsm:       number | null;
+  benchmarkPsm:       number | null;  // effective benchmark (scenario override if active, else model)
   benchmarkLow:       number | null;
   benchmarkHigh:      number | null;
   psmDeltaPct:        number | null;   // positive = above market
+  // Scenario support — always the model values regardless of scenario
+  scenarioActive:        boolean;
+  modelBenchmarkPsm:     number;
+  modelBenchmarkCapRate: number | null;
+  modelRentPsm:          number | null;
+  modelOccupancy:        number | null;  // % (0–100), derived from model vacancy rate
   // Income
   effectiveRent:      number | null;   // SAR/yr actually used
   impliedNoi:         number | null;
@@ -111,7 +118,7 @@ export const DEFAULT_SCREEN: ScreenInput = {
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
-export function runScreen(inp: ScreenInput): ScreenResult {
+export function runScreen(inp: ScreenInput, scenario: ScenarioOverrides = {}): ScreenResult {
   const flags: RiskFlag[] = [];
 
   // ── Market benchmarks via valuation engine ─────────────────────────────────
@@ -128,22 +135,44 @@ export function runScreen(inp: ScreenInput): ScreenResult {
   };
   const val = computeValuation(valInput);
 
-  const benchmarkPsm  = val.reconciledValue  / REF_SIZE;
+  // ── Model values (always preserved for delta display) ─────────────────────
+  const modelBenchmarkPsm  = val.reconciledValue  / REF_SIZE;
+  const modelBenchmarkCapRate  = val.incomeApproach?.capRate ?? null;
+  const modelRentPsm  = val.incomeApproach ? val.incomeApproach.grossRentalIncome / REF_SIZE : null;
+  const modelOccupancy = val.incomeApproach
+    ? Math.round((1 - val.incomeApproach.vacancyRate) * 100)
+    : null;
+
+  // ── Scenario layer — overrides applied on top of model defaults ────────────
+  const scenarioActive = hasScenario(scenario);
+
+  // Effective benchmark PSM: use scenario if provided, else model
+  const benchmarkPsm  = scenario.psmPrice  ?? modelBenchmarkPsm;
+  const benchmarkCapRate   = scenario.capRate != null
+    ? scenario.capRate / 100
+    : modelBenchmarkCapRate;
+
   const benchmarkLow  = val.reconciledLow    / REF_SIZE;
   const benchmarkHigh = val.reconciledHigh   / REF_SIZE;
-  const benchmarkCapRate   = val.incomeApproach?.capRate ?? null;
-  const benchmarkSource    = `AOUJ Market Reference (${SAMA_TAG})`;
-  const benchmarkSourceId  = VALUATION_SOURCE_ID;
+  const benchmarkSource    = scenarioActive
+    ? "My Assumptions (scenario override)"
+    : `AOUJ Market Reference (${SAMA_TAG})`;
+  const benchmarkSourceId  = scenarioActive ? SCENARIO_SOURCE_ID : VALUATION_SOURCE_ID;
 
   // ── User inputs ────────────────────────────────────────────────────────────
   const { price, size, holdYears } = inp;
   const pricePerSqm = price && size ? price / size : null;
   const psmDeltaPct = pricePerSqm ? (pricePerSqm - benchmarkPsm) / benchmarkPsm * 100 : null;
 
-  // Income: prefer annualRent, fall back to yieldPct × price
+  // Income: prefer annualRent, fall back to yieldPct × price, then scenario rentPsm
   let effectiveRent: number | null = inp.annualRent;
   if (!effectiveRent && inp.yieldPct && price) {
     effectiveRent = price * (inp.yieldPct / 100);
+  }
+  // Scenario rent fallback: rentPsm × size × occupancy
+  if (!effectiveRent && scenario.rentPsm != null && size) {
+    const occ = scenario.occupancy != null ? scenario.occupancy / 100 : 1;
+    effectiveRent = scenario.rentPsm * size * occ;
   }
   const hasIncome = !!effectiveRent;
 
@@ -174,6 +203,9 @@ export function runScreen(inp: ScreenInput): ScreenResult {
     : null;
 
   // ── IRR (base / bear / bull) ───────────────────────────────────────────────
+  // Use scenario growthRate if provided (as % → fraction), else default 2%
+  const baseGrowth = scenario.growthRate != null ? scenario.growthRate / 100 : 0.02;
+
   let unleveredIRR: number | null = null;
   let leveredIRR:   number | null = null;
   let irrBear:      number | null = null;
@@ -181,11 +213,11 @@ export function runScreen(inp: ScreenInput): ScreenResult {
 
   if (price && impliedNoi) {
     const base = computeIrrResult(price, impliedNoi,
-      { holdYears, rentGrowthRate: 0.02, exitCapRateDelta: 0 }, ltvData);
+      { holdYears, rentGrowthRate: baseGrowth as RentGrowth, exitCapRateDelta: 0 }, ltvData);
     const bear = computeIrrResult(price, impliedNoi,
-      { holdYears, rentGrowthRate: 0.00, exitCapRateDelta: 0.010 }, ltvData);
+      { holdYears, rentGrowthRate: Math.max(0, baseGrowth - 0.02) as RentGrowth, exitCapRateDelta: 0.010 }, ltvData);
     const bull = computeIrrResult(price, impliedNoi,
-      { holdYears, rentGrowthRate: 0.04, exitCapRateDelta: -0.005 }, ltvData);
+      { holdYears, rentGrowthRate: (baseGrowth + 0.02) as RentGrowth, exitCapRateDelta: -0.005 }, ltvData);
 
     unleveredIRR = base?.unleveredIRR ?? null;
     leveredIRR   = base?.leveredIRR   ?? null;
@@ -282,6 +314,7 @@ export function runScreen(inp: ScreenInput): ScreenResult {
     return buildResult("insufficient", "Enter a price to screen this deal.",
       "insufficient", score, flags,
       { pricePerSqm, benchmarkPsm, benchmarkLow, benchmarkHigh, psmDeltaPct,
+        scenarioActive, modelBenchmarkPsm, modelBenchmarkCapRate, modelRentPsm, modelOccupancy,
         effectiveRent, impliedNoi, impliedCapRate, benchmarkCapRate,
         yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
         maxLoan, annualDebtService, forcedSaleValue,
@@ -320,6 +353,7 @@ export function runScreen(inp: ScreenInput): ScreenResult {
 
   return buildResult(verdict, verdictReason, confidence, score, flags, {
     pricePerSqm, benchmarkPsm, benchmarkLow, benchmarkHigh, psmDeltaPct,
+    scenarioActive, modelBenchmarkPsm, modelBenchmarkCapRate, modelRentPsm, modelOccupancy,
     effectiveRent, impliedNoi, impliedCapRate, benchmarkCapRate,
     yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
     maxLoan, annualDebtService, forcedSaleValue,
@@ -336,7 +370,7 @@ function buildResult(
   confidence: ConfLevel,
   confidenceScore: number,
   flags: RiskFlag[],
-  fields: Omit<ScreenResult, "verdict" | "verdictReason" | "confidence" | "confidenceScore" | "flags" | "samaRepoRate" | "samaTag">,
+  fields: Omit<ScreenResult, "verdict"|"verdictReason"|"confidence"|"confidenceScore"|"flags"|"samaRepoRate"|"samaTag">,
 ): ScreenResult {
   return {
     ...fields,

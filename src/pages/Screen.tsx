@@ -11,6 +11,10 @@ import {
   TrendingUp, AlertTriangle, Info, ChevronRight,
 } from "lucide-react";
 import { ProvenanceBadge } from "@/components/ProvenanceBadge";
+import { ScenarioPanel } from "@/components/ScenarioPanel";
+import {
+  ScenarioOverrides, getScenario, saveScenario, resetScenario,
+} from "@/lib/scenario";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +116,7 @@ export default function Screen() {
   const { lang, isAr } = useLang();
   const [inp, setInp] = useState<ScreenInput>(DEFAULT_SCREEN);
   const [incomeMode, setIncomeMode] = useState<"rent" | "yield">("rent");
+  const [scenario, setScenario] = useState<ScenarioOverrides>(() => getScenario());
 
   const set = <K extends keyof ScreenInput>(k: K, v: ScreenInput[K]) =>
     setInp(p => ({ ...p, [k]: v }));
@@ -124,10 +129,19 @@ export default function Screen() {
   const clearIncome = () => setInp(p => ({ ...p, annualRent: null, yieldPct: null }));
   const handleReset = () => setInp(DEFAULT_SCREEN);
 
+  const handleScenarioChange = (s: ScenarioOverrides) => {
+    setScenario(s);
+    saveScenario(s);
+  };
+  const handleScenarioReset = () => {
+    resetScenario();
+    setScenario({});
+  };
+
   const availDistricts = DISTRICTS[inp.city] ?? [];
 
   // Reactive — compute on every input change. Pure sync math, no debounce needed.
-  const result = useMemo(() => runScreen(inp), [inp]);
+  const result = useMemo(() => runScreen(inp, scenario), [inp, scenario]);
   const vcfg   = VERDICT_CFG[result.verdict];
   const ccfg   = CONF_CFG[result.confidence];
 
@@ -297,6 +311,16 @@ export default function Screen() {
               ))}
             </div>
           </div>
+          {/* My Assumptions / Scenario */}
+          <ScenarioPanel
+            scenario={scenario}
+            onChange={handleScenarioChange}
+            onReset={handleScenarioReset}
+            modelPsm={result.modelBenchmarkPsm}
+            modelRentPsm={result.modelRentPsm}
+            modelOccupancy={result.modelOccupancy}
+            modelCapRate={result.modelBenchmarkCapRate}
+          />
         </div>
 
         {/* Reset */}
@@ -362,25 +386,66 @@ export default function Screen() {
             {/* ── Benchmark bar ── */}
             {result.benchmarkPsm && (
               <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                     Market Reference
                   </p>
                   <ProvenanceBadge sourceId={result.benchmarkSourceId} />
+                  {result.scenarioActive && (
+                    <ProvenanceBadge sourceId="aouj-model-q1-2026" className="opacity-50" />
+                  )}
                 </div>
+
+                {/* Model vs Scenario delta row — only when scenario overrides PSM */}
+                {result.scenarioActive && scenario.psmPrice != null && (
+                  <div className="flex items-center gap-4 rounded-md bg-secondary/60 px-3 py-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">Model</p>
+                      <p className="font-mono text-muted-foreground">
+                        {psm(result.modelBenchmarkPsm)}
+                      </p>
+                    </div>
+                    <div className="text-muted-foreground/40">→</div>
+                    <div>
+                      <p className="text-foreground font-medium">Your Assumption</p>
+                      <p className="font-mono text-blue-400">{psm(result.benchmarkPsm)}</p>
+                    </div>
+                    {result.modelBenchmarkPsm > 0 && (
+                      <div className="ml-auto">
+                        <p className="text-muted-foreground">Δ</p>
+                        <p className={`font-mono text-xs ${
+                          scenario.psmPrice > result.modelBenchmarkPsm
+                            ? "text-amber-400" : "text-emerald-400"
+                        }`}>
+                          {pct((scenario.psmPrice - result.modelBenchmarkPsm) / result.modelBenchmarkPsm * 100)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  {/* Bar */}
+                  {/* Bar — anchored to effective benchmarkPsm */}
                   <div className="relative h-6 bg-secondary rounded-full overflow-hidden">
-                    {/* Market range band */}
                     {result.benchmarkLow && result.benchmarkHigh && (
                       <div
                         className="absolute inset-y-0 bg-primary/20 rounded-full"
-                        style={{
-                          left:  "20%",
-                          right: "20%",
-                        }}
+                        style={{ left: "20%", right: "20%" }}
                       />
                     )}
+                    {/* Model PSM marker when scenario active */}
+                    {result.scenarioActive && scenario.psmPrice != null && (() => {
+                      const min = result.benchmarkPsm * 0.5;
+                      const max = result.benchmarkPsm * 1.5;
+                      const pos = Math.max(2, Math.min(96,
+                        ((result.modelBenchmarkPsm - min) / (max - min)) * 100
+                      ));
+                      return (
+                        <div className="absolute inset-y-0 flex items-center" style={{ left: `${pos}%` }} title="Model benchmark">
+                          <div className="w-0.5 h-full bg-muted-foreground/40" />
+                        </div>
+                      );
+                    })()}
                     {/* User price marker */}
                     {result.pricePerSqm && result.benchmarkPsm && (() => {
                       const min = result.benchmarkPsm * 0.5;
@@ -394,23 +459,21 @@ export default function Screen() {
                         </div>
                       );
                     })()}
-                    {/* Benchmark marker */}
-                    {(() => {
-                      return (
-                        <div className="absolute inset-y-0 flex items-center" style={{ left: "50%" }}>
-                          <div className="w-0.5 h-full bg-border" />
-                        </div>
-                      );
-                    })()}
+                    {/* Benchmark / scenario marker */}
+                    <div className="absolute inset-y-0 flex items-center" style={{ left: "50%" }}>
+                      <div className={`w-0.5 h-full ${result.scenarioActive && scenario.psmPrice != null ? "bg-blue-400/70" : "bg-border"}`} />
+                    </div>
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>−50% market</span>
-                    <span className="text-foreground font-medium">
-                      Market: {psm(result.benchmarkPsm)}
+                    <span>−50%</span>
+                    <span className={`font-medium ${result.scenarioActive && scenario.psmPrice != null ? "text-blue-400" : "text-foreground"}`}>
+                      {result.scenarioActive && scenario.psmPrice != null ? "Your benchmark: " : "Market: "}
+                      {psm(result.benchmarkPsm)}
                     </span>
-                    <span>+50% market</span>
+                    <span>+50%</span>
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3 pt-1 text-xs">
                   <div>
                     <p className="text-muted-foreground">Your Price</p>
@@ -424,9 +487,16 @@ export default function Screen() {
                   </div>
                   {result.benchmarkCapRate && (
                     <div>
-                      <p className="text-muted-foreground">Market Cap Rate</p>
-                      <p className="font-mono text-foreground">
+                      <p className="text-muted-foreground">
+                        {result.scenarioActive && scenario.capRate != null ? "Your Cap Rate" : "Market Cap Rate"}
+                      </p>
+                      <p className={`font-mono ${result.scenarioActive && scenario.capRate != null ? "text-blue-400" : "text-foreground"}`}>
                         {(result.benchmarkCapRate * 100).toFixed(2)}%
+                        {result.scenarioActive && scenario.capRate != null && result.modelBenchmarkCapRate != null && (
+                          <span className="text-muted-foreground ml-1.5">
+                            (Model: {(result.modelBenchmarkCapRate * 100).toFixed(2)}%)
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
