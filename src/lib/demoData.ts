@@ -2,13 +2,15 @@
 // Seeds 5 realistic Saudi institutional deals into localStorage on first visit.
 // Idempotent — checks flag before seeding so it never overwrites real data.
 
-import { computeValuation, PropertyInput } from "./valuation";
+import { computeValuation, PropertyInput, DEMO_SOURCE_ID } from "./valuation";
 import {
   Case, DEFAULT_CHECKLIST,
   DealStage, StageEvent, AuditEntry, DecisionRecord, ChecklistItem,
 } from "./cases";
 
-const SEED_FLAG = "aouj_demo_seeded_v1";
+// Bump this version string whenever the demo data structure changes,
+// to force a re-seed on existing browsers.
+const SEED_FLAG = "aouj_demo_seeded_v2";
 
 function makeId(n: number) {
   return `demo_deal_${n}`;
@@ -233,7 +235,10 @@ export function seedDemoData(): void {
     // Don't overwrite real data with same ID (unlikely but safe)
     if (toSeed[spec.id]) continue;
 
-    const result = computeValuation(spec.input);
+    const result = {
+      ...computeValuation(spec.input),
+      benchmarkSourceId: DEMO_SOURCE_ID,   // override: demo data, not model estimate
+    };
 
     const c: Case = {
       id: spec.id,

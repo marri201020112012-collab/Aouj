@@ -5,7 +5,7 @@
 // Logic is intentionally transparent and replaceable — mock where needed,
 // replace with real data sources as they become available.
 
-import { computeValuation, PropertyInput } from "./valuation";
+import { computeValuation, PropertyInput, VALUATION_SOURCE_ID } from "./valuation";
 import { computeIrrResult, HoldYears } from "./irr";
 
 // ── Constants (mirrored from valuation.ts) ────────────────────────────────────
@@ -94,6 +94,7 @@ export interface ScreenResult {
   flags:              RiskFlag[];
   hasIncome:          boolean;
   benchmarkSource:    string;
+  benchmarkSourceId:  string;   // references SOURCE_ID in src/lib/sources.ts
 }
 
 export const DEFAULT_SCREEN: ScreenInput = {
@@ -130,8 +131,9 @@ export function runScreen(inp: ScreenInput): ScreenResult {
   const benchmarkPsm  = val.reconciledValue  / REF_SIZE;
   const benchmarkLow  = val.reconciledLow    / REF_SIZE;
   const benchmarkHigh = val.reconciledHigh   / REF_SIZE;
-  const benchmarkCapRate = val.incomeApproach?.capRate ?? null;
-  const benchmarkSource  = `AOUJ Market Reference (${SAMA_TAG})`;
+  const benchmarkCapRate   = val.incomeApproach?.capRate ?? null;
+  const benchmarkSource    = `AOUJ Market Reference (${SAMA_TAG})`;
+  const benchmarkSourceId  = VALUATION_SOURCE_ID;
 
   // ── User inputs ────────────────────────────────────────────────────────────
   const { price, size, holdYears } = inp;
@@ -284,7 +286,7 @@ export function runScreen(inp: ScreenInput): ScreenResult {
         yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
         maxLoan, annualDebtService, forcedSaleValue,
         unleveredIRR, leveredIRR, irrBear, irrBull,
-        hasIncome, benchmarkSource });
+        hasIncome, benchmarkSource, benchmarkSourceId });
   }
 
   const hasCritical = flags.some(f => f.level === "critical");
@@ -322,7 +324,7 @@ export function runScreen(inp: ScreenInput): ScreenResult {
     yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
     maxLoan, annualDebtService, forcedSaleValue,
     unleveredIRR, leveredIRR, irrBear, irrBull,
-    hasIncome, benchmarkSource,
+    hasIncome, benchmarkSource, benchmarkSourceId,
   });
 }
 

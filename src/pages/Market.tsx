@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { computeValuation } from "@/lib/valuation";
 import { formatSAR } from "@/lib/utils";
 import { PlusCircle, Trash2, TrendingUp, TrendingDown, Minus, Database } from "lucide-react";
+import { ProvenanceBadge, ProvenanceBlock } from "@/components/ProvenanceBadge";
+import { SOURCE_ID } from "@/lib/sources";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,7 @@ function BenchmarkTable() {
           <tr className="border-b border-border">
             <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
               Asset Type
+              <ProvenanceBadge sourceId={SOURCE_ID.MODEL} className="ml-2 align-middle" />
             </th>
             {CITIES_GRID.map(c => (
               <th key={c} className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
@@ -120,9 +123,9 @@ function BenchmarkTable() {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-muted-foreground/50 mt-3">
-        AOUJ Market Reference Q1 2026 · Representative district benchmark · Not certified valuations
-      </p>
+      <div className="mt-4">
+        <ProvenanceBlock sourceId={SOURCE_ID.MODEL} />
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   CheckCircle, AlertCircle, XCircle, Minus,
   TrendingUp, AlertTriangle, Info, ChevronRight,
 } from "lucide-react";
+import { ProvenanceBadge } from "@/components/ProvenanceBadge";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -361,9 +362,12 @@ export default function Screen() {
             {/* ── Benchmark bar ── */}
             {result.benchmarkPsm && (
               <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                  Market Reference
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                    Market Reference
+                  </p>
+                  <ProvenanceBadge sourceId={result.benchmarkSourceId} />
+                </div>
                 <div className="space-y-2">
                   {/* Bar */}
                   <div className="relative h-6 bg-secondary rounded-full overflow-hidden">
@@ -513,9 +517,12 @@ export default function Screen() {
             )}
 
             {/* Source note */}
-            <p className="text-xs text-muted-foreground/50 pb-4">
-              Directional only. All benchmarks are analyst estimates (Q1 2026). Not a certified valuation.
-            </p>
+            <div className="flex items-center gap-2 pb-4">
+              <ProvenanceBadge sourceId={result.benchmarkSourceId} showMeta />
+              <p className="text-xs text-muted-foreground/50">
+                Directional only. Not a certified valuation.
+              </p>
+            </div>
           </div>
         )}
       </div>

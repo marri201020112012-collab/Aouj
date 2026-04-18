@@ -117,6 +117,9 @@ export interface ValuationResult {
   // Legacy aliases (backward compat with CaseDetail)
   rangeLow: number;
   rangeHigh: number;
+
+  // Provenance — references SOURCE_ID in src/lib/sources.ts
+  benchmarkSourceId: string;
 }
 
 // ─── LOOKUP DATA ──────────────────────────────────────────────────────────────
@@ -136,6 +139,12 @@ export const DISTRICTS: Record<string, string[]> = {
 export const PROPERTY_TYPES = ["Residential Villa", "Apartment", "Commercial", "Office", "Land", "Warehouse"];
 export const CONDITIONS = ["Excellent", "Good", "Fair", "Poor"];
 export const TRANSACTION_TYPES = ["Sale", "Rent"];
+
+// Well-known source IDs — imported by UI; kept here to avoid circular deps with sources.ts
+export const VALUATION_SOURCE_ID  = "aouj-model-q1-2026";
+export const SAMA_RATE_SOURCE_ID  = "sama-repo-q1-2026";
+export const SAMA_LTV_SOURCE_ID   = "sama-ltv-regs-2024";
+export const DEMO_SOURCE_ID       = "aouj-demo-v1";
 
 // Capital value base SAR/sqm by city (comparable-derived, Q1 2026)
 const CITY_BASE: Record<string, number> = {
@@ -725,6 +734,8 @@ export function computeValuation(input: PropertyInput): ValuationResult {
     // legacy aliases
     rangeLow: reconciledLow,
     rangeHigh: reconciledHigh,
+    // provenance
+    benchmarkSourceId: VALUATION_SOURCE_ID,
   };
 }
 
