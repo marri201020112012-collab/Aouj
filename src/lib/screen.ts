@@ -8,6 +8,7 @@
 import { computeValuation, PropertyInput, VALUATION_SOURCE_ID } from "./valuation";
 import { computeIrrResult, HoldYears, RentGrowth } from "./irr";
 import { ScenarioOverrides, SCENARIO_SOURCE_ID, hasScenario } from "./scenario";
+import { computeCompBenchmark, CompBenchmark } from "./compBenchmark";
 
 // ── Constants (mirrored from valuation.ts) ────────────────────────────────────
 
@@ -102,6 +103,9 @@ export interface ScreenResult {
   hasIncome:          boolean;
   benchmarkSource:    string;
   benchmarkSourceId:  string;   // references SOURCE_ID in src/lib/sources.ts
+  // Comp-derived benchmark — separate layer, never overwrites model or scenario values
+  // null when no comps match, or when qualityLabel = "insufficient"
+  compBenchmark:      CompBenchmark | null;
 }
 
 export const DEFAULT_SCREEN: ScreenInput = {
@@ -142,6 +146,17 @@ export function runScreen(inp: ScreenInput, scenario: ScenarioOverrides = {}): S
   const modelOccupancy = val.incomeApproach
     ? Math.round((1 - val.incomeApproach.vacancyRate) * 100)
     : null;
+
+  // ── Comp-derived benchmark (third independent layer) ──────────────────────
+  // Computed from saved transactions in localStorage. Never overwrites model
+  // or scenario values. null when no comps match or count < MIN_COMPS.
+  const _rawCompBenchmark = computeCompBenchmark(inp.city, inp.assetType, {
+    district:    inp.district,
+    includeDemo: true,
+  });
+  // Expose null when quality is insufficient so UI can hide the card cleanly.
+  const compBenchmark: CompBenchmark | null =
+    _rawCompBenchmark?.qualityLabel === "insufficient" ? null : _rawCompBenchmark;
 
   // ── Scenario layer — overrides applied on top of model defaults ────────────
   const scenarioActive = hasScenario(scenario);
@@ -319,7 +334,7 @@ export function runScreen(inp: ScreenInput, scenario: ScenarioOverrides = {}): S
         yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
         maxLoan, annualDebtService, forcedSaleValue,
         unleveredIRR, leveredIRR, irrBear, irrBull,
-        hasIncome, benchmarkSource, benchmarkSourceId });
+        hasIncome, benchmarkSource, benchmarkSourceId, compBenchmark });
   }
 
   const hasCritical = flags.some(f => f.level === "critical");
@@ -358,7 +373,7 @@ export function runScreen(inp: ScreenInput, scenario: ScenarioOverrides = {}): S
     yieldVsBenchBps, yieldVsSamaBps, ltv, ltvIsDefault,
     maxLoan, annualDebtService, forcedSaleValue,
     unleveredIRR, leveredIRR, irrBear, irrBull,
-    hasIncome, benchmarkSource, benchmarkSourceId,
+    hasIncome, benchmarkSource, benchmarkSourceId, compBenchmark,
   });
 }
 

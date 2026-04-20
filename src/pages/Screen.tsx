@@ -16,7 +16,8 @@ import {
   ScenarioOverrides, getScenario, saveScenario, resetScenario,
 } from "@/lib/scenario";
 import { getCompsForScreen } from "@/lib/comps";
-import { Eye, EyeOff, Link as LinkIcon } from "lucide-react";
+import { BenchmarkQuality, CompBenchmark } from "@/lib/compBenchmark";
+import { Eye, EyeOff, Link as LinkIcon, FlaskConical } from "lucide-react";
 import { Link } from "react-router-dom";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,6 +110,131 @@ function MetricCell({ label, value, sub, highlight }: {
         {value}
       </p>
       {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Comp-derived benchmark card ───────────────────────────────────────────────
+
+const QUALITY_CFG: Record<BenchmarkQuality, {
+  badgeStatus: "verified" | "user_entered" | "estimated" | "demo";
+  label:   string;
+  border:  string;
+  bg:      string;
+  text:    string;
+  dot:     string;
+}> = {
+  verified:     { badgeStatus: "verified",    label: "Verified comps",  border: "border-emerald-700/40", bg: "bg-emerald-900/10", text: "text-emerald-400", dot: "bg-emerald-400" },
+  mixed:        { badgeStatus: "user_entered", label: "Mixed evidence",  border: "border-blue-700/40",    bg: "bg-blue-900/10",    text: "text-blue-400",    dot: "bg-blue-400"   },
+  estimated:    { badgeStatus: "estimated",   label: "Indicative",      border: "border-amber-700/40",   bg: "bg-amber-900/10",   text: "text-amber-400",   dot: "bg-amber-400"  },
+  "demo-only":  { badgeStatus: "demo",        label: "Demo data only",  border: "border-border",         bg: "bg-secondary/40",   text: "text-muted-foreground", dot: "bg-muted-foreground/40" },
+  insufficient: { badgeStatus: "estimated",   label: "Insufficient",    border: "border-border",         bg: "bg-secondary/20",   text: "text-muted-foreground", dot: "bg-muted-foreground/30" },
+};
+
+function CompBenchmarkCard({
+  cb,
+  dealPsm,
+  modelPsm,
+}: {
+  cb:       CompBenchmark;
+  dealPsm:  number | null;
+  modelPsm: number;
+}) {
+  const cfg = QUALITY_CFG[cb.qualityLabel];
+  const psm = (v: number) => `${Math.round(v).toLocaleString()} SAR/sqm`;
+  const pct = (a: number, b: number) => {
+    const d = ((a - b) / b) * 100;
+    return { str: `${d >= 0 ? "+" : ""}${d.toFixed(0)}%`, pos: d > 0 };
+  };
+
+  const dealVsComp   = dealPsm  ? pct(dealPsm, cb.avgPsm)  : null;
+  const modelVsComp  = pct(modelPsm, cb.avgPsm);
+
+  // Source mix pill list
+  const mixParts: string[] = [];
+  if (cb.sourceMix.verifiedCount  > 0) mixParts.push(`${cb.sourceMix.verifiedCount} verified`);
+  if (cb.sourceMix.userCount      > 0) mixParts.push(`${cb.sourceMix.userCount} user-entered`);
+  if (cb.sourceMix.estimatedCount > 0) mixParts.push(`${cb.sourceMix.estimatedCount} estimated`);
+  if (cb.sourceMix.demoCount      > 0) mixParts.push(`${cb.sourceMix.demoCount} demo`);
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${cfg.border} ${cfg.bg}`}>
+      {/* Header */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FlaskConical className={`w-3.5 h-3.5 shrink-0 ${cfg.text}`} />
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Comp-Derived Benchmark
+        </p>
+        <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border ${cfg.text} ${cfg.bg} ${cfg.border}`}>
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+          {cfg.label}
+        </span>
+        {cb.matchedDistrict && (
+          <span className="text-[10px] text-muted-foreground/60">
+            {cb.matchedDistrict} ({cb.count} comp{cb.count > 1 ? "s" : ""})
+          </span>
+        )}
+        {!cb.matchedDistrict && (
+          <span className="text-[10px] text-muted-foreground/60">
+            {cb.city} · all districts · {cb.count} comp{cb.count > 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Key stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div>
+          <p className="text-muted-foreground">Avg PSM</p>
+          <p className={`font-mono font-semibold text-sm ${cfg.text}`}>{psm(cb.avgPsm)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Median PSM</p>
+          <p className="font-mono text-foreground">{psm(cb.medianPsm)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Range</p>
+          <p className="font-mono text-foreground">
+            {Math.round(cb.minPsm).toLocaleString()} – {Math.round(cb.maxPsm).toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Date range</p>
+          <p className="font-mono text-foreground text-[10px] leading-tight">
+            {cb.oldestDate}<br />→ {cb.newestDate}
+          </p>
+        </div>
+      </div>
+
+      {/* Delta row */}
+      <div className="flex flex-wrap gap-4 text-xs border-t border-border/30 pt-2">
+        {dealVsComp && (
+          <div>
+            <p className="text-muted-foreground">Your deal vs comp avg</p>
+            <p className={`font-mono font-medium ${
+              Math.abs(parseFloat(dealVsComp.str)) < 5 ? "text-muted-foreground" :
+              dealVsComp.pos ? "text-amber-400" : "text-emerald-400"
+            }`}>
+              {dealVsComp.str}
+            </p>
+          </div>
+        )}
+        <div>
+          <p className="text-muted-foreground">Model vs comp avg</p>
+          <p className={`font-mono ${
+            Math.abs(parseFloat(modelVsComp.str)) < 5 ? "text-muted-foreground" :
+            modelVsComp.pos ? "text-amber-400" : "text-emerald-400"
+          }`}>
+            {modelVsComp.str}
+          </p>
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-muted-foreground">Source mix</p>
+          <p className="text-muted-foreground/70">{mixParts.join(" · ")}</p>
+        </div>
+      </div>
+
+      {/* Quality note */}
+      <p className="text-[10px] text-muted-foreground/60 leading-relaxed">{cb.qualityNote}</p>
     </div>
   );
 }
@@ -520,6 +646,15 @@ export default function Screen() {
                 </div>
                 <p className="text-xs text-muted-foreground/60">{result.benchmarkSource}</p>
               </div>
+            )}
+
+            {/* ── Comp-derived benchmark ── */}
+            {result.compBenchmark && (
+              <CompBenchmarkCard
+                cb={result.compBenchmark}
+                dealPsm={result.pricePerSqm}
+                modelPsm={result.modelBenchmarkPsm}
+              />
             )}
 
             {/* ── Comparable transactions ── */}
