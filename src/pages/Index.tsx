@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import { saveCase, generateCaseId, DEFAULT_CHECKLIST, DEFAULT_LEGAL_REVIEW } fro
 import {
   Shield, AlertTriangle, TrendingUp, ChevronRight, Save,
   DollarSign, BarChart2, Building2, Info, CheckCircle, XCircle, AlertCircle,
-  Calculator,
+  Calculator, FlaskConical, SlidersHorizontal,
 } from "lucide-react";
 import {
   computeIrrResult, DEFAULT_IRR_INPUTS, IrrInputs, HoldYears, RentGrowth, ExitCapDelta,
@@ -21,6 +21,10 @@ import { useLang } from "@/lib/lang";
 import {
   cityName, districtName, propTypeName, conditionName, txTypeName,
 } from "@/lib/i18n";
+import { ProvenanceBadge } from "@/components/ProvenanceBadge";
+import { SOURCE_ID } from "@/lib/sources";
+import { computeCompBenchmark, CompBenchmark } from "@/lib/compBenchmark";
+import { getScenario, hasScenario } from "@/lib/scenario";
 
 const defaultInput: PropertyInput = {
   city: "Riyadh", district: "Al Olaya", propertyType: "Residential Villa",
@@ -107,6 +111,17 @@ const Index = () => {
     toast.success(t("result.saveCase"), { description: title });
     navigate(`/cases/${id}`);
   };
+
+  const scenario = useMemo(() => getScenario(), []);
+  const scenarioActive = hasScenario(scenario);
+
+  const compBenchmark = useMemo<CompBenchmark | null>(() => {
+    const cb = computeCompBenchmark(input.city, input.propertyType, {
+      district: input.district,
+      includeDemo: true,
+    });
+    return cb && cb.qualityLabel !== "insufficient" ? cb : null;
+  }, [input.city, input.propertyType, input.district]);
 
   const availableDistricts = DISTRICTS[input.city] ?? ["Central District"];
   const isRent = input.transactionType === "Rent";
@@ -305,6 +320,108 @@ const Index = () => {
                   style={{ borderColor: "hsl(var(--warning-border))", backgroundColor: "hsl(var(--warning-bg))" }}>
                   <AlertTriangle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <p className="text-sm text-secondary-foreground leading-relaxed">{result.governanceWarning}</p>
+                </div>
+              )}
+            </section>
+
+            {/* ── 1.5 Evidence Reference ── */}
+            <section className="bg-card border border-border rounded-lg p-6 animate-in fade-in duration-500">
+              <SectionHeader icon={<FlaskConical className="w-4 h-4" />} title="Evidence Reference" />
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Model layer */}
+                <div className="bg-secondary/60 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ProvenanceBadge sourceId={SOURCE_ID.MODEL} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1">Model PSM</p>
+                  <p className="text-lg font-mono text-foreground">{result.pricePerSqm.toLocaleString()} SAR/m²</p>
+                </div>
+
+                {/* Comp-derived layer */}
+                <div className={`rounded-lg p-4 ${compBenchmark ? "bg-secondary/60" : "bg-secondary/30 border border-dashed border-border"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <FlaskConical className="w-3 h-3 text-amber-400" />
+                    <span className="text-xs text-amber-400 font-medium">Comp-Derived</span>
+                  </div>
+                  {compBenchmark ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-1">{compBenchmark.count} comps · {compBenchmark.qualityLabel}</p>
+                      <p className="text-lg font-mono text-foreground">{compBenchmark.avgPsm.toLocaleString()} SAR/m²</p>
+                      {(() => {
+                        const delta = ((compBenchmark.avgPsm - result.pricePerSqm) / result.pricePerSqm) * 100;
+                        return (
+                          <p className={`text-xs mt-1 font-mono ${Math.abs(delta) < 5 ? "text-muted-foreground" : delta > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% vs model
+                          </p>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-2">No comps for this city/type — add transactions in the Comps repository</p>
+                  )}
+                </div>
+
+                {/* Scenario layer */}
+                <div className={`rounded-lg p-4 ${scenarioActive ? "bg-secondary/60" : "bg-secondary/30 border border-dashed border-border"}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <SlidersHorizontal className="w-3 h-3 text-blue-400" />
+                    <span className="text-xs text-blue-400 font-medium">Scenario</span>
+                  </div>
+                  {scenarioActive && scenario.psmPrice ? (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-1">Analyst PSM override</p>
+                      <p className="text-lg font-mono text-foreground">{scenario.psmPrice.toLocaleString()} SAR/m²</p>
+                      {(() => {
+                        const delta = ((scenario.psmPrice - result.pricePerSqm) / result.pricePerSqm) * 100;
+                        return (
+                          <p className={`text-xs mt-1 font-mono ${Math.abs(delta) < 5 ? "text-muted-foreground" : delta > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% vs model
+                          </p>
+                        );
+                      })()}
+                    </>
+                  ) : scenarioActive ? (
+                    <p className="text-xs text-muted-foreground mt-2">Scenario active — other assumptions adjusted, no PSM override set</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-2">No scenario — set assumptions in the Screener</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Active scenario overrides detail */}
+              {scenarioActive && (scenario.rentPsm || scenario.occupancy || scenario.capRate || scenario.growthRate) && (
+                <div className="mt-4 bg-blue-900/10 border border-blue-700/20 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <SlidersHorizontal className="w-3 h-3 text-blue-400" />
+                    <p className="text-xs font-medium text-blue-400 uppercase tracking-wider">Active Scenario Overrides</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {scenario.rentPsm && (
+                      <div className="bg-secondary/50 rounded px-2 py-1.5">
+                        <p className="text-xs text-muted-foreground">Rent PSM</p>
+                        <p className="text-xs font-mono text-foreground mt-0.5">{scenario.rentPsm.toLocaleString()} SAR/m²/yr</p>
+                      </div>
+                    )}
+                    {scenario.occupancy && (
+                      <div className="bg-secondary/50 rounded px-2 py-1.5">
+                        <p className="text-xs text-muted-foreground">Occupancy</p>
+                        <p className="text-xs font-mono text-foreground mt-0.5">{scenario.occupancy}%</p>
+                      </div>
+                    )}
+                    {scenario.capRate && (
+                      <div className="bg-secondary/50 rounded px-2 py-1.5">
+                        <p className="text-xs text-muted-foreground">Cap Rate</p>
+                        <p className="text-xs font-mono text-foreground mt-0.5">{scenario.capRate}%</p>
+                      </div>
+                    )}
+                    {scenario.growthRate && (
+                      <div className="bg-secondary/50 rounded px-2 py-1.5">
+                        <p className="text-xs text-muted-foreground">Growth Rate</p>
+                        <p className="text-xs font-mono text-foreground mt-0.5">{scenario.growthRate}% p.a.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </section>
