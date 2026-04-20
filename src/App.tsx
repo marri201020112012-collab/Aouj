@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { LangProvider } from "./lib/lang";
 import { seedDemoData } from "./lib/demoData";
-import { seedDemoComps } from "./lib/comps";
+import { seedDemoComps, seedImportedComps } from "./lib/comps";
 import Nav from "./components/Nav";
 import Landing from "./pages/Landing";
 import Screen from "./pages/Screen";
@@ -16,6 +16,7 @@ import Comps from "./pages/Comps";
 // Seed demo data on first load (idempotent)
 seedDemoData();
 seedDemoComps();
+seedImportedComps();
 
 export default function App() {
   return (

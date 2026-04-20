@@ -207,3 +207,161 @@ export function seedDemoComps(): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   localStorage.setItem(SEED_FLAG, "1");
 }
+
+// ── Imported comps — Manus extraction batch v1 ────────────────────────────────
+// Source: REGA public transaction disclosures (3 records) + Aqar listings (12 records).
+// REGA records: verified confirmed sale transactions.
+// Aqar records: listing proxies — prices are asking/listed, not confirmed settlement.
+// Asset type mapping from CSV: residential→Residential Villa, apartment building→Apartment,
+// mixed-use→Commercial. Districts stored as sourced — some are outside the screener
+// dropdown but stored verbatim and match at city level.
+
+const IMPORT_SEED_FLAG = "aouj_comps_seeded_v2";
+
+function makeImported(
+  partial: Omit<Comp, "id" | "psmPrice" | "createdAt" | "isDemo">,
+): Comp {
+  return {
+    ...partial,
+    id:       `imported_${partial.assetName.replace(/\W+/g, "_").toLowerCase().slice(0, 40)}`,
+    psmPrice: Math.round(partial.transactionValue / partial.area),
+    createdAt: new Date().toISOString(),
+    isDemo:    false,
+  };
+}
+
+const IMPORTED_COMPS: Comp[] = [
+  // ── REGA verified transactions ─────────────────────────────────────────────
+  makeImported({
+    assetName: "REGA Sale — Al Malqa Residential",
+    city: "Riyadh", district: "Al Malqa", assetType: "Residential Villa",
+    area: 450, transactionDate: "2025-06-20", transactionValue: 3_200_000,
+    source: "REGA",
+    notes: "Confirmed REGA-registered sale transaction.",
+    verificationStatus: "verified", confidenceScore: 85, isObserved: true,
+  }),
+  makeImported({
+    assetName: "REGA Sale — Al Rawdah Apartment Building",
+    city: "Jeddah", district: "Al Rawdah", assetType: "Apartment",
+    area: 1_200, transactionDate: "2025-05-15", transactionValue: 12_500_000,
+    source: "REGA",
+    notes: "Confirmed REGA-registered sale transaction.",
+    verificationStatus: "verified", confidenceScore: 85, isObserved: true,
+  }),
+  makeImported({
+    assetName: "REGA Sale — Al Shatea Land",
+    city: "Dammam", district: "Al Shatea", assetType: "Land",
+    area: 800, transactionDate: "2025-04-10", transactionValue: 2_400_000,
+    source: "REGA",
+    notes: "Confirmed REGA-registered sale transaction.",
+    verificationStatus: "verified", confidenceScore: 85, isObserved: true,
+  }),
+
+  // ── Aqar listing proxies ───────────────────────────────────────────────────
+  makeImported({
+    assetName: "Commercial Building — Al Manar",
+    city: "Riyadh", district: "Al Manar", assetType: "Apartment",
+    area: 870, transactionDate: "2026-04-20", transactionValue: 10_500_000,
+    source: "Aqar",
+    notes: "Listing proxy. 11 halls with mezzanines. 2 years old. Price not confirmed settlement.",
+    verificationStatus: "estimated", confidenceScore: 50, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Okaz",
+    city: "Riyadh", district: "Okaz", assetType: "Apartment",
+    area: 132, transactionDate: "2026-04-20", transactionValue: 500_000,
+    source: "Aqar",
+    notes: "Listing proxy. Price not confirmed settlement.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Investment Building — Al Janadriyah",
+    city: "Riyadh", district: "Al Janadriyah", assetType: "Apartment",
+    area: 2_343, transactionDate: "2026-04-20", transactionValue: 27_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. 86 studios, 8 shops. 5 years old.",
+    verificationStatus: "estimated", confidenceScore: 50, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Al Misfat — 37 Units",
+    city: "Riyadh", district: "Al Misfat", assetType: "Apartment",
+    area: 3_000, transactionDate: "2026-04-20", transactionValue: 10_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. 37 residential units.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Badr",
+    city: "Riyadh", district: "Badr", assetType: "Apartment",
+    area: 1_000, transactionDate: "2026-04-20", transactionValue: 9_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. Price not confirmed settlement.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Al Faisaliyah (Riyadh)",
+    city: "Riyadh", district: "Al Faisaliyah", assetType: "Apartment",
+    area: 3_000, transactionDate: "2026-04-20", transactionValue: 18_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. Price not confirmed settlement.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Commercial Plot — As Saadah",
+    city: "Riyadh", district: "As Saadah", assetType: "Land",
+    area: 200, transactionDate: "2026-04-20", transactionValue: 600_000,
+    source: "Aqar",
+    notes: "Listing proxy. Commercial plot.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Mixed-Use Building — Al Marwah",
+    city: "Riyadh", district: "Al Marwah", assetType: "Commercial",
+    area: 1_003, transactionDate: "2026-04-20", transactionValue: 3_500_000,
+    source: "Aqar",
+    notes: "Listing proxy. Commercial building + residential villa.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Apartment Complex — Ar Rimal",
+    city: "Riyadh", district: "Ar Rimal", assetType: "Apartment",
+    area: 600, transactionDate: "2026-04-20", transactionValue: 4_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. Apartment complex.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Ad Dar Al Baida — 19 Units",
+    city: "Riyadh", district: "Ad Dar Al Baida", assetType: "Apartment",
+    area: 1_260, transactionDate: "2026-04-20", transactionValue: 8_400_000,
+    source: "Aqar",
+    notes: "Listing proxy. 19 residential units.",
+    verificationStatus: "estimated", confidenceScore: 50, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Building Al Faruq — Mixed Use",
+    city: "Riyadh", district: "Al Faruq", assetType: "Commercial",
+    area: 1_180, transactionDate: "2026-04-20", transactionValue: 7_000_000,
+    source: "Aqar",
+    notes: "Listing proxy.",
+    verificationStatus: "estimated", confidenceScore: 45, isObserved: false,
+  }),
+  makeImported({
+    assetName: "Office Building — An Narjis",
+    city: "Riyadh", district: "An Narjis", assetType: "Office",
+    area: 2_200, transactionDate: "2026-04-20", transactionValue: 84_000_000,
+    source: "Aqar",
+    notes: "Listing proxy. Premium office building. PSM (38,182) is a significant outlier — verify before using in analysis.",
+    verificationStatus: "estimated", confidenceScore: 35, isObserved: false,
+  }),
+];
+
+export function seedImportedComps(): void {
+  if (localStorage.getItem(IMPORT_SEED_FLAG)) return;
+  const all = loadComps();
+  for (const comp of IMPORTED_COMPS) {
+    if (!all[comp.id]) all[comp.id] = comp;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  localStorage.setItem(IMPORT_SEED_FLAG, "1");
+}
