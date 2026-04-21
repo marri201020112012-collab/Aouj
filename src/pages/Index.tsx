@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,19 +76,27 @@ const Index = () => {
     setResult(null);
   };
 
+  const getCompForInput = useCallback((inp: PropertyInput) => {
+    const cb = computeCompBenchmark(inp.city, inp.propertyType, {
+      district: inp.district,
+      includeDemo: true,
+    });
+    return cb && cb.qualityLabel !== "insufficient" ? cb : null;
+  }, []);
+
   const handleGenerate = () => {
     if (!input.size || input.size <= 0) {
       toast.error(t("form.sizeError"));
       return;
     }
-    setResult(computeValuation(input));
+    setResult(computeValuation(input, getCompForInput(input)));
   };
 
   const handleScenario = (idx: number) => {
     const s = SAMPLE_SCENARIOS[idx];
     setInput({ ...s.input });
     setActiveScenario(idx);
-    setResult(computeValuation(s.input));
+    setResult(computeValuation(s.input, getCompForInput(s.input)));
   };
 
   const handleSaveCase = () => {
@@ -334,31 +342,31 @@ const Index = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <ProvenanceBadge sourceId={SOURCE_ID.MODEL} />
                   </div>
-                  <p className="text-xs text-muted-foreground mb-1">Model PSM</p>
-                  <p className="text-lg font-mono text-foreground">{result.pricePerSqm.toLocaleString()} SAR/m²</p>
+                  <p className="text-xs text-muted-foreground mb-1">Model PSM (pure)</p>
+                  <p className="text-lg font-mono text-foreground">{result.modelPsmRaw.toLocaleString()} SAR/m²</p>
+                  {result.compAnchorWeight !== null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {Math.round((1 - result.compAnchorWeight) * 100)}% weight in blend
+                    </p>
+                  )}
                 </div>
 
                 {/* Comp-derived layer */}
-                <div className={`rounded-lg p-4 ${compBenchmark ? "bg-secondary/60" : "bg-secondary/30 border border-dashed border-border"}`}>
+                <div className={`rounded-lg p-4 ${compBenchmark ? "bg-amber-900/10 border border-amber-700/20" : "bg-secondary/30 border border-dashed border-border"}`}>
                   <div className="flex items-center gap-2 mb-2">
                     <FlaskConical className="w-3 h-3 text-amber-400" />
-                    <span className="text-xs text-amber-400 font-medium">Comp-Derived</span>
+                    <span className="text-xs text-amber-400 font-medium">Comp Anchor</span>
                   </div>
                   {compBenchmark ? (
                     <>
                       <p className="text-xs text-muted-foreground mb-1">{compBenchmark.count} comps · {compBenchmark.qualityLabel}</p>
                       <p className="text-lg font-mono text-foreground">{compBenchmark.avgPsm.toLocaleString()} SAR/m²</p>
-                      {(() => {
-                        const delta = ((compBenchmark.avgPsm - result.pricePerSqm) / result.pricePerSqm) * 100;
-                        return (
-                          <p className={`text-xs mt-1 font-mono ${Math.abs(delta) < 5 ? "text-muted-foreground" : delta > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% vs model
-                          </p>
-                        );
-                      })()}
+                      <p className="text-xs text-amber-400 mt-1">
+                        {Math.round((result.compAnchorWeight ?? 0) * 100)}% weight in valuation
+                      </p>
                     </>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-2">No comps for this city/type — add transactions in the Comps repository</p>
+                    <p className="text-xs text-muted-foreground mt-2">No comps — add transactions in the Comps repository to anchor this valuation</p>
                   )}
                 </div>
 
@@ -388,6 +396,29 @@ const Index = () => {
                   )}
                 </div>
               </div>
+
+              {/* Blended PSM output */}
+              {result.compAnchorPsm !== null && (
+                <div className="mt-3 bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Blended PSM → used in valuation</p>
+                    <p className="text-xl font-mono text-foreground mt-0.5">{result.pricePerSqm.toLocaleString()} SAR/m²</p>
+                  </div>
+                  <div className="text-right">
+                    {(() => {
+                      const delta = ((result.pricePerSqm - result.modelPsmRaw) / result.modelPsmRaw) * 100;
+                      return (
+                        <>
+                          <p className={`text-sm font-mono font-semibold ${Math.abs(delta) < 2 ? "text-muted-foreground" : delta > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% vs model-only
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">comps {delta > 0 ? "push value up" : delta < 0 ? "pull value down" : "confirm model"}</p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Active scenario overrides detail */}
               {scenarioActive && (scenario.rentPsm || scenario.occupancy || scenario.capRate || scenario.growthRate) && (

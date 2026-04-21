@@ -1,5 +1,8 @@
 // ─── INTERFACES ───────────────────────────────────────────────────────────────
 
+import type { CompBenchmark } from "./compBenchmark";
+export type { CompBenchmark };
+
 export interface PropertyInput {
   city: string;
   district: string;
@@ -120,6 +123,11 @@ export interface ValuationResult {
 
   // Provenance — references SOURCE_ID in src/lib/sources.ts
   benchmarkSourceId: string;
+
+  // Comp integration
+  modelPsmRaw: number;          // pure model PSM before comp blending
+  compAnchorPsm: number | null; // comp avg PSM used as anchor (null if no comps)
+  compAnchorWeight: number | null; // weight given to comp anchor (0–1)
 }
 
 // ─── LOOKUP DATA ──────────────────────────────────────────────────────────────
@@ -612,7 +620,7 @@ function buildMarketContext(
 
 // ─── MAIN FUNCTION ────────────────────────────────────────────────────────────
 
-export function computeValuation(input: PropertyInput): ValuationResult {
+export function computeValuation(input: PropertyInput, compBenchmark?: CompBenchmark | null): ValuationResult {
   const { city, district, propertyType, size, condition, transactionType, yearBuilt, floorLevel, hasStreetFrontage } = input;
 
   const cityBase = CITY_BASE[city] ?? 5_000;
@@ -626,7 +634,26 @@ export function computeValuation(input: PropertyInput): ValuationResult {
   const sizeAdj = sizeAdjustmentFactor(size, propertyType);
 
   // ── Sales comparison ──
-  const pricePerSqm = cityBase * districtMult * typeMult * condMult * floorMult * frontageMult * v2030Mult * depFactor * sizeAdj;
+  const modelPsmRaw = cityBase * districtMult * typeMult * condMult * floorMult * frontageMult * v2030Mult * depFactor * sizeAdj;
+
+  // ── Comp anchor blending ──
+  // When transaction comps are available, weight them into the PSM anchor.
+  // Verified REGA comps dominate (80%); estimated/listing proxies get lower weight.
+  let compAnchorPsm: number | null = null;
+  let compAnchorWeight: number | null = null;
+  let pricePerSqm = modelPsmRaw;
+
+  if (compBenchmark && compBenchmark.qualityLabel !== "insufficient") {
+    const w =
+      compBenchmark.qualityLabel === "verified"  ? 0.80 :
+      compBenchmark.qualityLabel === "mixed"     ? 0.60 :
+      compBenchmark.qualityLabel === "demo-only" ? 0.20 : 0.30; // estimated
+
+    compAnchorPsm    = compBenchmark.avgPsm;
+    compAnchorWeight = w;
+    pricePerSqm      = compBenchmark.avgPsm * w + modelPsmRaw * (1 - w);
+  }
+
   const salesCompValue = pricePerSqm * size;
 
   // ── Confidence ──
@@ -679,8 +706,12 @@ export function computeValuation(input: PropertyInput): ValuationResult {
 
   // ── Reasoning ──
   const reasoning: string[] = [
-    `Comparable base for ${city}: SAR ${cityBase.toLocaleString()}/sqm (Q1 2026).`,
-    `${district} location adjustment: ${districtMult >= 1 ? "+" : ""}${Math.round((districtMult - 1) * 100)}% → SAR ${round10(cityBase * districtMult).toLocaleString()}/sqm.`,
+    ...(compAnchorPsm !== null
+      ? [`Comp anchor (${compBenchmark!.count} transactions, ${compBenchmark!.qualityLabel}): SAR ${compAnchorPsm.toLocaleString()}/sqm at ${Math.round(compAnchorWeight! * 100)}% weight → blended PSM SAR ${round10(pricePerSqm).toLocaleString()}/sqm.`]
+      : [`No transaction comps for ${city} ${propertyType} — model benchmark used exclusively.`]
+    ),
+    `Model benchmark for ${city}: SAR ${round10(modelPsmRaw).toLocaleString()}/sqm (Q1 2026 deterministic model).`,
+    `${district} location adjustment: ${districtMult >= 1 ? "+" : ""}${Math.round((districtMult - 1) * 100)}%.`,
     `${propertyType}: ${Math.round(typeMult * 100)}% of residential villa benchmark per sqm.`,
     `${condition} condition: ${condMult >= 1 ? "+" : ""}${Math.round((condMult - 1) * 100)}% quality adjustment.`,
     ...(floorMult !== 1.0 ? [`Floor ${floorLevel} premium: ${floorMult >= 1 ? "+" : ""}${Math.round((floorMult - 1) * 100)}%.`] : []),
@@ -689,6 +720,7 @@ export function computeValuation(input: PropertyInput): ValuationResult {
     ...(sizeAdj !== 1.0 ? [`Size adjustment (${size} sqm, ${propertyType}): ${sizeAdj >= 1 ? "+" : ""}${Math.round((sizeAdj - 1) * 100)}% — ${sizeAdj > 1 ? "small unit premium" : "large asset per-sqm discount"}.`] : []),
     ...(depFactor < 1.0 ? [`Depreciation factor: ${depFactor.toFixed(3)} (building age adjustment).`] : []),
     `Sales comparison value: SAR ${round1k(salesCompValue).toLocaleString()} (SAR ${round10(pricePerSqm).toLocaleString()}/sqm × ${size} sqm).`,
+    ...(depFactor < 1.0 ? [] : []),  // (depreciation note shown separately)
     ...(incomeApproach ? [
       `Income approach: NOI SAR ${incomeApproach.noi.toLocaleString()} ÷ ${(incomeApproach.capRate * 100).toFixed(2)}% cap rate (${incomeApproach.capRateSource}) = SAR ${incomeApproach.incomeValue.toLocaleString()}.`,
       `Vacancy applied: ${Math.round(incomeApproach.vacancyRate * 100)}% (${incomeApproach.vacancySource}).`,
@@ -736,6 +768,10 @@ export function computeValuation(input: PropertyInput): ValuationResult {
     rangeHigh: reconciledHigh,
     // provenance
     benchmarkSourceId: VALUATION_SOURCE_ID,
+    // comp integration
+    modelPsmRaw: round10(modelPsmRaw),
+    compAnchorPsm,
+    compAnchorWeight,
   };
 }
 
