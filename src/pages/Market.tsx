@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { computeValuation } from "@/lib/valuation";
 import { formatSAR } from "@/lib/utils";
-import { PlusCircle, Trash2, TrendingUp, TrendingDown, Minus, Database } from "lucide-react";
+import { PlusCircle, Trash2, TrendingUp, TrendingDown, Minus, Database, FlaskConical } from "lucide-react";
 import { ProvenanceBadge, ProvenanceBlock } from "@/components/ProvenanceBadge";
 import { SOURCE_ID } from "@/lib/sources";
+import { computeCompBenchmark, CompBenchmark, BenchmarkQuality } from "@/lib/compBenchmark";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,37 @@ const selectCls = inputCls;
 
 // ── Benchmark table ───────────────────────────────────────────────────────────
 
+const QUALITY_COLOR: Record<BenchmarkQuality, string> = {
+  verified:     "text-emerald-400",
+  mixed:        "text-blue-400",
+  estimated:    "text-amber-400",
+  "demo-only":  "text-muted-foreground/50",
+  insufficient: "text-muted-foreground/40",
+};
+
+function CompCell({ cb }: { cb: CompBenchmark | null }) {
+  if (!cb) return (
+    <p className="text-[10px] text-muted-foreground/30 mt-0.5">No comps</p>
+  );
+
+  const color = QUALITY_COLOR[cb.qualityLabel];
+  const label = cb.matchedDistrict
+    ? `${cb.count} comp${cb.count > 1 ? "s" : ""} · ${cb.matchedDistrict}`
+    : `${cb.count} comp${cb.count > 1 ? "s" : ""} · city avg`;
+
+  return (
+    <div className="mt-1 pt-1 border-t border-border/30 space-y-0.5">
+      <div className="flex items-center justify-end gap-1">
+        <FlaskConical className={`w-2.5 h-2.5 ${color}`} />
+        <p className={`font-mono text-[10px] font-medium ${color}`}>
+          {psm(cb.avgPsm)} SAR/sqm
+        </p>
+      </div>
+      <p className="text-[9px] text-muted-foreground/50">{label}</p>
+    </div>
+  );
+}
+
 function BenchmarkTable() {
   const grid = useMemo(() => {
     return CITIES_GRID.map(city => ({
@@ -70,62 +102,92 @@ function BenchmarkTable() {
           size: 100, condition: "Good", transactionType: "Sale",
         });
         const capRate = v.incomeApproach?.capRate ?? null;
+        // Comp benchmark — try district first, fall back to city
+        const cb = computeCompBenchmark(city, type, { district, includeDemo: true });
+        const compCell = cb?.qualityLabel === "insufficient" ? null : cb ?? null;
         return {
           type,
-          psm: v.reconciledValue / 100,
-          low: v.reconciledLow  / 100,
-          high: v.reconciledHigh / 100,
+          psm:  v.reconciledValue / 100,
+          low:  v.reconciledLow   / 100,
+          high: v.reconciledHigh  / 100,
           capRate,
+          compCell,
         };
       }),
     }));
   }, []);
 
+  // Count total comp-covered cells for the legend
+  const coveredCount = grid.flatMap(g => g.rows).filter(r => r.compCell !== null).length;
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
-              Asset Type
-              <ProvenanceBadge sourceId={SOURCE_ID.MODEL} className="ml-2 align-middle" />
-            </th>
-            {CITIES_GRID.map(c => (
-              <th key={c} className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                {c}
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                Asset Type
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {TYPES_GRID.map(type => (
-            <tr key={type} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-              <td className="py-2.5 pr-4 text-xs text-foreground font-medium whitespace-nowrap">
-                {type}
-              </td>
-              {grid.map(({ city, rows }) => {
-                const row = rows.find(r => r.type === type)!;
-                return (
-                  <td key={city} className="py-2.5 px-4 text-right">
-                    <p className="font-mono text-xs text-foreground">{psm(row.psm)} SAR/sqm</p>
-                    <p className="text-[10px] text-muted-foreground/70">
-                      {psm(row.low)} – {psm(row.high)}
-                    </p>
-                    {row.capRate && (
-                      <p className="text-[10px] text-muted-foreground/70">
-                        Cap {(row.capRate * 100).toFixed(1)}%
-                      </p>
-                    )}
-                  </td>
-                );
-              })}
+              {CITIES_GRID.map(c => (
+                <th key={c} className="text-right py-2.5 px-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  {c}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="mt-4">
-        <ProvenanceBlock sourceId={SOURCE_ID.MODEL} />
+          </thead>
+          <tbody>
+            {TYPES_GRID.map(type => (
+              <tr key={type} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                <td className="py-3 pr-4 text-xs text-foreground font-medium whitespace-nowrap align-top">
+                  {type}
+                </td>
+                {grid.map(({ city, rows }) => {
+                  const row = rows.find(r => r.type === type)!;
+                  return (
+                    <td key={city} className="py-3 px-4 text-right align-top">
+                      {/* Model row */}
+                      <div className="flex items-center justify-end gap-1">
+                        <ProvenanceBadge sourceId={SOURCE_ID.MODEL} className="text-[8px] px-1 py-0" />
+                        <p className="font-mono text-xs text-foreground">{psm(row.psm)}</p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/60">
+                        {psm(row.low)} – {psm(row.high)}
+                      </p>
+                      {row.capRate && (
+                        <p className="text-[10px] text-muted-foreground/60">
+                          Cap {(row.capRate * 100).toFixed(1)}%
+                        </p>
+                      )}
+                      {/* Comp layer */}
+                      <CompCell cb={row.compCell} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground/70 pt-1">
+        <div className="flex items-center gap-1">
+          <ProvenanceBadge sourceId={SOURCE_ID.MODEL} className="text-[8px]" />
+          <span>Model estimate (AOUJ)</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <FlaskConical className="w-3 h-3 text-blue-400" />
+          <span>Comp-derived avg (transaction evidence)</span>
+        </div>
+        <span className="ml-auto">
+          {coveredCount > 0
+            ? `${coveredCount} of ${CITIES_GRID.length * TYPES_GRID.length} cells have comp data`
+            : "No comp data yet — add transactions in the Comps tab"}
+        </span>
+      </div>
+
+      <ProvenanceBlock sourceId={SOURCE_ID.MODEL} />
     </div>
   );
 }
