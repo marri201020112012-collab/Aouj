@@ -27,6 +27,16 @@ export default {
       fontFamily: {
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
       },
+      borderRadius: {
+        'sm':   '2px',
+        DEFAULT: '3px',
+        'md':   '3px',
+        'lg':   '4px',
+        'xl':   '6px',
+        '2xl':  '8px',
+        '3xl':  '10px',
+        'full': '9999px',
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

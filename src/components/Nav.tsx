@@ -26,15 +26,17 @@ export default function Nav() {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
-      <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/98 backdrop-blur-sm">
+      {/* Gold authority stripe */}
+      <div className="h-0.5 bg-gradient-to-r from-transparent via-primary/80 to-transparent" />
+      <div className="mx-auto max-w-6xl px-6 h-13 flex items-center justify-between">
 
         {/* Brand */}
-        <Link to="/" className="flex items-center gap-2.5 shrink-0">
-          <span className="w-2 h-2 rounded-sm bg-primary shrink-0" />
-          <span className="text-base font-serif text-foreground tracking-tight">{t("nav.brand")}</span>
-          <span className="text-xs text-muted-foreground hidden md:inline opacity-60">
-            · {t("nav.subtitle")}
+        <Link to="/" className="flex items-center gap-3 shrink-0">
+          <span className="w-1.5 h-5 bg-primary shrink-0" style={{ borderRadius: '1px' }} />
+          <span className="text-sm font-serif text-foreground tracking-widest uppercase">{t("nav.brand")}</span>
+          <span className="text-xs text-muted-foreground/50 hidden md:inline pl-2 border-l border-border">
+            {t("nav.subtitle")}
           </span>
         </Link>
 

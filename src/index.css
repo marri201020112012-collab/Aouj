@@ -5,19 +5,19 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 6%;
-  --foreground: 0 0% 94%;
-  --card: 0 0% 10%;
-  --card-foreground: 0 0% 94%;
-  --border: 0 0% 16%;
-  --primary: 43 96% 56%;
+  --background: 0 0% 5%;
+  --foreground: 0 0% 95%;
+  --card: 0 0% 8%;
+  --card-foreground: 0 0% 95%;
+  --border: 0 0% 13%;
+  --primary: 43 88% 52%;
   --primary-foreground: 0 0% 5%;
-  --secondary: 0 0% 13%;
-  --secondary-foreground: 0 0% 85%;
-  --muted: 0 0% 13%;
-  --muted-foreground: 0 0% 60%;
-  --warning-bg: 43 80% 7%;
-  --warning-border: 43 70% 22%;
+  --secondary: 0 0% 11%;
+  --secondary-foreground: 0 0% 86%;
+  --muted: 0 0% 11%;
+  --muted-foreground: 0 0% 55%;
+  --warning-bg: 43 80% 6%;
+  --warning-border: 43 70% 18%;
 }
 
 * {
@@ -28,6 +28,26 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures across all mono/number contexts — financial standard */
+.font-mono,
+[class*="tabular"],
+table td,
+table th {
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Institutional data label style */
+.data-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
 }
 
 /* Arabic RTL typography */
@@ -77,6 +97,11 @@ body {
   .text-primary { color: #b8860b !important; }
 }
 
+/* Gold top accent stripe — institutional authority mark */
+header.sticky {
+  border-top: 2px solid hsl(var(--primary) / 0.7);
+}
+
 /* Premium hero ambient glow */
 .hero-section {
   position: relative;
@@ -87,14 +112,30 @@ body {
   position: absolute;
   inset: -80px -60px 0;
   background:
-    radial-gradient(ellipse 60% 45% at 30% 0%, hsl(43 96% 56% / 0.08) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 35% at 70% 10%, hsl(43 96% 56% / 0.04) 0%, transparent 55%);
+    radial-gradient(ellipse 55% 40% at 25% 0%, hsl(43 88% 52% / 0.07) 0%, transparent 65%),
+    radial-gradient(ellipse 35% 30% at 75% 10%, hsl(43 88% 52% / 0.03) 0%, transparent 55%);
   pointer-events: none;
   z-index: 0;
 }
 .hero-section > * {
   position: relative;
   z-index: 1;
+}
+
+/* Key metric number — make it command the space */
+.metric-primary {
+  font-family: Georgia, serif;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+  font-feature-settings: "tnum" 1;
+}
+
+/* Thin gold divider — use instead of full borders for data sections */
+.divider-gold {
+  border: none;
+  border-top: 1px solid hsl(var(--primary) / 0.2);
 }
 
 /* Subtle card shadow on hover */
